@@ -2,7 +2,24 @@
 
 纯离线 Android 原生密码管理器 —— 所有数据本地加密存储，无网络、无账号、无云同步。新拟态（Neumorphism）视觉，三主题可切换，阴影参数可按口味个性化调节。
 
-> **状态**：v1.0.0（2026-09-06）—— 加密核心经独立代码审计核实，契约测试全绿。
+> **状态**：v1.0.1（2026-09-06）—— 加密核心经独立代码审计核实，契约测试全绿。
+
+## 界面截图
+
+<table>
+<tr>
+<td><img src="screenshots/01-unlock.jpg" width="200" alt="解锁页"></td>
+<td><img src="screenshots/02-list.jpg" width="200" alt="密码列表"></td>
+<td><img src="screenshots/03-settings.jpg" width="200" alt="设置"></td>
+<td><img src="screenshots/04-shadow.jpg" width="200" alt="阴影个性化"></td>
+</tr>
+<tr>
+<td align="center">解锁页</td>
+<td align="center">密码列表</td>
+<td align="center">设置</td>
+<td align="center">阴影个性化调参</td>
+</tr>
+</table>
 
 ## 特性
 
