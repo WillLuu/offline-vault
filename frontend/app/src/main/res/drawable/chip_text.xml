@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分类 chip 文字（照抄模板 .chip）：未选 = muted；选中 = primary -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:color="?attr/colorPrimary" />
+    <item android:color="@color/on_surface_variant" />
+</selector>

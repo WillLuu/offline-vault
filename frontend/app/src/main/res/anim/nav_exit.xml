@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导航切换·退出（简洁版）：快速淡出 + 轻微下沉（-2% 屏高），
+     与进入页交叉衔接；下层为窗口主题背景色，交叉期不露白底。 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false"
+    android:fillAfter="false">
+
+    <alpha
+        android:duration="160"
+        android:fromAlpha="1.0" android:toAlpha="0.0"
+        android:interpolator="@android:anim/accelerate_interpolator" />
+
+    <translate
+        android:duration="160"
+        android:fromYDelta="0" android:toYDelta="-2%p"
+        android:interpolator="@android:anim/accelerate_interpolator" />
+</set>

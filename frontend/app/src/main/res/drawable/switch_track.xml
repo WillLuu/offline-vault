@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 生物识别开关轨道 selector：开启 = 天蓝色凹陷圆柱；关闭 = 灰蓝凹陷圆柱 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:drawable="@drawable/switch_track_on"/>
+    <item android:drawable="@drawable/switch_track_off"/>
+</selector>

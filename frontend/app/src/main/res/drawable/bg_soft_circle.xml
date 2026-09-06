@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 新拟态凸起圆（指纹托盘）：同页面底色浮起 + 双影；按压下沉。
+     指纹图形用线条（accent 色），托盘本身不再是实心色块。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <gradient android:angle="315"
+                        android:startColor="?attr/pwdShadowLight"
+                        android:endColor="?attr/pwdShadowLightFade" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="oval">
+                    <gradient android:angle="135"
+                        android:startColor="?attr/pwdShadowDark"
+                        android:endColor="?attr/pwdShadowDarkFade" />
+                </shape>
+            </item>
+            <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
+                <shape android:shape="oval">
+                    <solid android:color="?android:attr/colorBackground" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <gradient android:angle="315"
+                        android:startColor="?attr/pwdShadowDark"
+                        android:endColor="?attr/pwdShadowDarkFade" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="oval">
+                    <gradient android:angle="135"
+                        android:startColor="?attr/pwdShadowLight"
+                        android:endColor="?attr/pwdShadowLightFade" />
+                </shape>
+            </item>
+            <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
+                <shape android:shape="oval">
+                    <solid android:color="?android:attr/colorBackground" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

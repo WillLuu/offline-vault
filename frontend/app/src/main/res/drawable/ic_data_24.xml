@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 数据（库）图标：底部导航"数据"入口 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,2C7.58,2 4,3.79 4,6v12c0,2.21 3.58,4 8,4s8,-1.79 8,-4V6c0,-2.21 -3.58,-4 -8,-4zM12,4c3.87,0 6,1.5 6,2s-2.13,2 -6,2 -6,-1.5 -6,-2 2.13,-2 6,-2zM18,18c0,0.5 -2.13,2 -6,2s-6,-1.5 -6,-2v-3.09c1.54,0.98 3.71,1.59 6,1.59s4.46,-0.61 6,-1.59V18zM18,12c0,0.5 -2.13,2 -6,2s-6,-1.5 -6,-2V8.91C7.54,9.89 9.71,10.5 12,10.5s4.46,-0.61 6,-1.59V12z" />
+</vector>

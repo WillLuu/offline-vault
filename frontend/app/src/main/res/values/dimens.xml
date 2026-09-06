@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 间距（SPEC §4.1：模板 sp-1..sp-4 + 常用 12/40） -->
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_sm">8dp</dimen>
+    <dimen name="space_12">12dp</dimen>
+    <dimen name="space_md">16dp</dimen>
+    <dimen name="space_lg">24dp</dimen>
+    <dimen name="space_40">40dp</dimen>
+
+    <!-- 圆角（模板 43：r-lg 26 / r-md 18 / r-sm 12 / full 999 胶囊=高/2 用 26）
+     radius_soft 16dp：凹陷元素专用（内阴影在 10-16dp 圆角最自然，过大角落突兀——用户建议） -->
+    <dimen name="radius_card">26dp</dimen>
+    <dimen name="radius_secret">16dp</dimen>
+    <dimen name="radius_soft">16dp</dimen>
+    <dimen name="radius_field">12dp</dimen>
+    <dimen name="radius_seg">11dp</dimen>
+    <dimen name="radius_pill">26dp</dimen>
+
+    <!-- 字号档（SPEC §4.2 type scale） -->
+    <dimen name="text_display">34sp</dimen>
+    <dimen name="text_large">22sp</dimen>
+    <dimen name="text_headline">17sp</dimen>
+    <dimen name="text_body">16sp</dimen>
+    <dimen name="text_title">20sp</dimen>
+    <dimen name="text_footnote">13sp</dimen>
+    <dimen name="text_caption">11sp</dimen>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 生物识别开关轨道颜色：开启 = 天蓝；关闭 = 灰蓝 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:color="#4FC3F7"/>
+    <item android:color="#C3C9D4"/>
+</selector>

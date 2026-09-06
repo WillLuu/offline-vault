@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 开关滑块（白球）：底部偏移深色圆做投影 = 凸起感。
+     必须给 item 显式尺寸：layer-list 内 shape 无固有尺寸，否则 Switch 测量为 0×0 不可见。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="26dp" android:height="26dp"
+        android:left="1dp" android:top="2dp" android:right="1dp" android:bottom="0dp">
+        <shape android:shape="oval">
+            <solid android:color="#99A3B1C6"/>
+        </shape>
+    </item>
+    <item android:width="26dp" android:height="26dp"
+        android:left="1dp" android:top="0dp" android:right="1dp" android:bottom="2dp">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFF"/>
+        </shape>
+    </item>
+</layer-list>

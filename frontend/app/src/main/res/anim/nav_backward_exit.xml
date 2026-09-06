@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导航后退·退出：旧页向右整体滑出，整体右移。 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false"
+    android:fillAfter="false">
+
+    <translate
+        android:duration="280"
+        android:fromXDelta="0" android:toXDelta="100%p"
+        android:interpolator="@android:anim/decelerate_interpolator" />
+</set>

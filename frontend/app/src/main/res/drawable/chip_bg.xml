@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分类筛选 chip（照抄 03 模板 .tab）：未选中 = 同底色小凸起（右下暗 + 左上亮）；
+     选中 = 按压凹陷（光影反转）。无轨道、无白块，全靠双影塑形。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中：凹陷（暗在左上、亮在右下，与凸起相反） -->
+    <item android:state_selected="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="315"
+                        android:startColor="?attr/pwdShadowLight"
+                        android:endColor="?attr/pwdShadowLightFade" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="135"
+                        android:startColor="?attr/pwdShadowDark"
+                        android:endColor="?attr/pwdShadowDarkFade" />
+                </shape>
+            </item>
+            <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="?android:attr/colorBackground" />
+                    <corners android:radius="25dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <!-- 未选中：凸起（暗在右下、亮在左上） -->
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="315"
+                        android:startColor="?attr/pwdShadowDark"
+                        android:endColor="?attr/pwdShadowDarkFade" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="135"
+                        android:startColor="?attr/pwdShadowLight"
+                        android:endColor="?attr/pwdShadowLightFade" />
+                </shape>
+            </item>
+            <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="?android:attr/colorBackground" />
+                    <corners android:radius="25dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

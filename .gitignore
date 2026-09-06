@@ -1,0 +1,29 @@
+# ---- 构建产物 ----
+.gradle/
+build/
+*/build/
+.kotlin/
+*.apk
+*.aab
+!gradle/wrapper/gradle-wrapper.jar
+
+# ---- 本机配置 ----
+local.properties
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ---- 会话/内部工作目录（不发布） ----
+.workbuddy/
+scratch/
+
+# ---- 内部审计与过程文档（保留本地，不入仓） ----
+CHECKPOINT*.md
+DELIVERY.md
+DESIGN-SPEC-*.md
+PONYTAIL-DEBT*.md
+REAL-DEVICE-TEST.md
+REVIEW-*.md
+review-report*.md
+smoke-test*.md

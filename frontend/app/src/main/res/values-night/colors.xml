@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色主题（契约：主色 #7C71FF）。DESIGN-SPEC-14 §6.2：玻璃族深色映射 -->
+    <color name="primary">#8EA0FF</color>
+    <color name="primary_variant">#9D94FF</color>
+    <color name="on_primary">#AAB8FF</color>
+
+    <color name="background">#252A34</color>
+    <color name="surface">#252A34</color>
+    <color name="on_surface">#C6CEDE</color>
+    <color name="on_surface_variant">#8D97AB</color>
+    <color name="outline">#2C2C3A</color>
+
+    <color name="success">#10B981</color>
+    <color name="warning">#F59E0B</color>
+    <color name="error">#EF4444</color>
+
+    <!-- 模板 43 深色 accent 与强度中等档 -->
+    <color name="accent">#4ECFAE</color>
+    <color name="strength_mid">#E0A83F</color>
+
+    <!-- 容器角色色（深色：选中态 chip / 品牌徽章底） -->
+    <color name="primary_container">#37326E</color>
+    <color name="on_primary_container">#E2DFFF</color>
+
+    <!-- 玻璃族（深色 SPEC §6.1：深紫玻璃 rgba(38,34,52,...) 系） -->
+    <color name="glass_strong">#B82C283C</color>
+    <color name="glass_card">#CC2E2A3E</color>
+    <color name="glass_bar">#8C262234</color>
+    <color name="glass_soft">#663C3850</color>
+    <color name="hairline_light">#29FFFFFF</color>
+
+    <!-- 卡/控件外描边：深色用白 16%（在深底上成立，替代浅色模式的墨 8%） -->
+    <color name="card_border">#29FFFFFF</color>
+
+    <!-- 危险操作（深色底上加深） -->
+    <color name="danger_bg">#2EEF4444</color>
+    <color name="danger_border">#66EF4444</color>
+
+    <!-- SOFT UI 新拟态基色（深色主题：规范 dark 段 -shadow-dark #12151c / -shadow-light #38414f） -->
+    <color name="shadow_dark">#12151C</color>
+    <color name="shadow_light">#38414F</color>
+    <color name="shadow_dark_fade">#0012151C</color>
+    <color name="shadow_light_fade">#0038414F</color>
+    <color name="particle">#8EA0FF</color>
+    <color name="particle_glow">#3A2A5E</color>
+
+    <!-- 内嵌元素底色与描边（深色：比页面底更深一档） -->
+    <color name="inset_bg">#1A1C28</color>
+    <color name="inset_border">#262735</color>
+    <color name="text_in">#E3E9F6</color>
+
+    <!-- NeuSurface 主面渐变端（深色）：凸起 = 左上 #38414F → 右下 #1B1E27
+         凹陷 = 左上 #1A1C28 → 右下 #2D313E -->
+    <color name="raised_hi">#38414F</color>
+    <color name="raised_lo">#1B1E27</color>
+    <color name="inset_hi">#2D313E</color>
+    <color name="inset_lo">#131520</color>
+</resources>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 浅色主题（契约：主色 #635BFF）。DESIGN-SPEC-14 §5/§6：玻璃族按"承载文字与否"分级统一，防止各页漂移 -->
+    <color name="primary">#5F6FD6</color>
+    <color name="primary_variant">#4B43D9</color>
+    <color name="on_primary">#4553B8</color>
+
+    <color name="background">#E0E5EC</color>
+    <color name="divider">#1C3A4A6B</color>
+    <color name="surface">#E0E5EC</color>
+    <color name="on_surface">#3A4A6B</color>
+    <color name="on_surface_variant">#7A86A0</color>
+    <color name="outline">#E2E2EA</color>
+
+    <color name="success">#10B981</color>
+    <color name="warning">#F59E0B</color>
+    <color name="error">#EF4444</color>
+
+    <!-- 模板 43 accent（复制钮/强度强档）与强度中等档 -->
+    <color name="accent">#3FB598</color>
+    <color name="strength_mid">#E0A83F</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- 容器角色色（Material3 层级：选中态/品牌徽章/浅紫氛围） -->
+    <color name="primary_container">#E9E7FF</color>
+    <color name="on_primary_container">#2A2380</color>
+
+    <!-- 玻璃族（SPEC §5.2，按承载文字与否分级；浅色=白填充）：
+         glass_strong .8  顶层悬浮：吸顶条/Sheet/seg 选中浮块/TabBar
+         glass_card   .78 内容卡（条目卡/分组卡/详情卡）
+         glass_bar    .62 输入条/搜索框底（半透明，需内衬文字少）
+         glass_soft   .4  seg 轨道/氛围衬底
+         hairline_light  白 50% 高光/内部分隔线（深色光斑底上用） -->
+    <color name="glass_strong">#CCFFFFFF</color>
+    <color name="glass_card">#C7FFFFFF</color>
+    <color name="glass_bar">#9EFFFFFF</color>
+    <color name="glass_soft">#66FFFFFF</color>
+    <color name="hairline_light">#80FFFFFF</color>
+
+    <!-- 卡/控件外描边：浅色平底用墨 8%（白描边不可见）；深色模式覆盖为白 16%（values-night） -->
+    <color name="card_border">#14110E28</color>
+
+    <!-- 危险操作（删除类，SPEC §3.1 .btn-danger）：红字 + 10% 红底 + 30% 红描边 -->
+    <color name="danger_bg">#1AEF4444</color>
+    <color name="danger_border">#4DEF4444</color>
+
+    <!-- Morandi 主题常驻色（DESIGN-SPEC SOFT UI morandi 段；无常驻限定符，供 Theme.PasswordVault.Morandi 引用）。
+         bg #d9d3cb / text #54504a / text-in #35322e / sub #5f5952 / accent #9a8778 / accent-text #6f5e50 -->
+    <color name="morandi_bg">#D9D3CB</color>
+    <color name="morandi_surface">#E0DAD2</color>
+    <color name="morandi_surface_hi">#E3DDD5</color>
+    <color name="morandi_text">#54504A</color>
+    <color name="morandi_text_in">#35322E</color>
+    <color name="morandi_sub">#6B655C</color>
+    <color name="morandi_primary">#9A8778</color>
+    <color name="morandi_on_primary">#FFFFFF</color>
+    <color name="morandi_primary_container">#EDE6DC</color>
+    <color name="morandi_on_primary_container">#6F5E50</color>
+    <color name="morandi_outline">#C4BCB1</color>
+    <color name="morandi_shadow_dark">#B0A89E</color>
+    <color name="morandi_shadow_light">#F2EBE3</color>
+    <color name="morandi_success">#6E8B5E</color>
+    <color name="morandi_warning">#B08D3E</color>
+    <color name="morandi_error">#B05C50</color>
+    <color name="morandi_inset_bg">#C5BFB6</color>
+    <color name="morandi_inset_border">#BDB5AB</color>
+    <color name="morandi_shadow_dark_fade">#00B0A89E</color>
+    <color name="morandi_shadow_light_fade">#00F2EBE3</color>
+    <!-- Morandi NeuSurface 主面渐变端 -->
+    <color name="morandi_raised_hi">#F2EBE3</color>
+    <color name="morandi_raised_lo">#BDB5AB</color>
+    <color name="morandi_inset_hi">#F2EBE3</color>
+    <color name="morandi_inset_lo">#C5BFB6</color>
+
+    <!-- SOFT UI 新拟态基色（浅色主题：规范 light 段 -shadow-dark #a3b1c6 / -shadow-light #ffffff；同色系底色 #e0e5ec 已被现有 #EEF0F8 家族替代，保持冷紫灰以便与既有界面融合） -->
+    <color name="shadow_dark">#A3B1C6</color>
+    <color name="shadow_light">#FFFFFF</color>
+    <color name="shadow_dark_fade">#00AEB9CD</color>
+    <color name="shadow_light_fade">#00FFFFFF</color>
+    <color name="particle">#5F6FD6</color>
+    <color name="particle_glow">#FFFFFF</color>
+
+    <!-- 内嵌元素（输入框/凹槽）底色与描边：浅色下比页面底色略深一档（#E0E5EC → #D6DAE2），
+         下沉感主要靠内阴影塑形，底色不宜过深（过深会变成"实心色块"） -->
+    <color name="inset_bg">#D6DAE2</color>
+    <color name="inset_border">#D5D8E2</color>
+    <color name="text_in">#28324B</color>
+
+    <!-- NeuSurface 主面渐变端（浅色）：凸起 = 左上 #FFFFFF → 右下 #CDD2DC（模拟斜上光源）
+         凹陷 = 左上 #A8B0BC（深） → 右下 #FFFFFF（亮），差距 ~90 RGB 让"内陷"立体感明显 -->
+    <color name="raised_hi">#FFFFFF</color>
+    <color name="raised_lo">#CDD2DC</color>
+    <color name="inset_hi">#FFFFFF</color>
+    <color name="inset_lo">#A8B0BC</color>
+</resources>

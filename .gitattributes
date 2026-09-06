@@ -1,0 +1,8 @@
+# 换行符规范：仓库内统一 LF，签出按平台；脚本类强制固定，防跨平台构建失败
+* text=auto
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.jar binary

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导航前进·退出：旧页向左移出 30% 并压暗，与新页形成视差层次（简单但有纵深）。 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false"
+    android:fillAfter="false">
+
+    <translate
+        android:duration="280"
+        android:fromXDelta="0" android:toXDelta="-30%p"
+        android:interpolator="@android:anim/decelerate_interpolator" />
+
+    <alpha
+        android:duration="280"
+        android:fromAlpha="1.0" android:toAlpha="0.55"
+        android:interpolator="@android:anim/decelerate_interpolator" />
+</set>

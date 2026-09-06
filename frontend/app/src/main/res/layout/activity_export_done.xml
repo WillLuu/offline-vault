@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导出完成页（新拟态真高斯模糊版）：成功图标 = NeuSurface CIRCLE RAISED LG；主按钮 = NeuSurface RAISED LG 胶囊 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center" android:background="?android:attr/colorBackground"
+    android:padding="@dimen/space_lg"
+    android:clipChildren="false" android:clipToPadding="false">
+
+    <!-- 成功图标：NeuSurface CIRCLE wrap_content + 内 76dp ImageView -->
+    <com.qiqiao.passwordvault.ui.common.NeuSurface
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        app:neuShape="circle"
+        app:neuDirection="raised"
+        app:neuElevation="lg">
+
+        <ImageView
+            android:layout_width="76dp" android:layout_height="76dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_check_24"
+            android:importantForAccessibility="no"
+            android:contentDescription="@string/export_done_title" />
+    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/export_done_title" android:textSize="@dimen/text_large"
+        android:textStyle="bold" android:textColor="@color/on_surface" android:layout_marginTop="@dimen/space_md" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/export_done_msg" android:textColor="@color/on_surface_variant"
+        android:layout_marginTop="@dimen/space_sm" />
+    <TextView android:id="@+id/tvFileName" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textColor="@color/on_surface" android:layout_marginTop="@dimen/space_md"
+        android:textIsSelectable="true" />
+
+    <!-- 完成按钮：NeuSurface RAISED LG 胶囊 wrap_content + 内 52dp Button -->
+    <com.qiqiao.passwordvault.ui.common.NeuSurface
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_lg"
+        app:neuDirection="raised"
+        app:neuElevation="lg"
+        app:neuCornerRadius="@dimen/radius_pill">
+
+        <Button android:id="@+id/btnFinish"
+            android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@android:color/transparent"
+            android:textColor="?attr/colorOnPrimary" android:textSize="16sp"
+            android:text="@string/export_done_finish" android:textAllCaps="false" />
+    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+</LinearLayout>

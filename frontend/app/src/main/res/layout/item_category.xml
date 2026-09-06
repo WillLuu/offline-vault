@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分类凸卡（新拟态真高斯模糊版）：NeuSurface 凸起容器 + 内部内容。 -->
+<com.qiqiao.passwordvault.ui.common.NeuSurface
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/space_12"
+    app:neuDirection="raised"
+    app:neuElevation="sm"
+    app:neuCornerRadius="@dimen/radius_card">
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:padding="16dp">
+
+        <ImageView android:id="@+id/ivDrag"
+            android:layout_width="24dp" android:layout_height="24dp"
+            android:layout_marginEnd="8dp" android:importantForAccessibility="no"
+            android:src="@drawable/ic_drag_24"
+            android:contentDescription="@string/category_drag_handle" />
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/tvCatName" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textSize="@dimen/text_headline" android:textStyle="bold" android:textColor="@color/on_surface" />
+            <TextView android:id="@+id/tvCatCount" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/on_surface_variant" android:textSize="13sp" />
+        </LinearLayout>
+        <Button android:id="@+id/btnCatEdit" style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/category_edit" android:textAllCaps="false" />
+        <Button android:id="@+id/btnCatDelete" style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_xs"
+            android:text="@string/category_delete" android:textAllCaps="false" />
+    </LinearLayout>
+</com.qiqiao.passwordvault.ui.common.NeuSurface>

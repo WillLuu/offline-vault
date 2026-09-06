@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 头像圆形裁剪 outline：OvalShape 背景提供圆形 outline，配合 clipToOutline=true 裁剪图片 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#00000000"/>
+</shape>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导航后退·进入：往导航序号更小的页面切（如 数据→主页）＝后退：
+     新页从左侧 30% 处滑回原位，并从压暗恢复到全亮（与前进退出态对称）。 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false"
+    android:fillAfter="false">
+
+    <translate
+        android:duration="280"
+        android:fromXDelta="-30%p" android:toXDelta="0"
+        android:interpolator="@android:anim/decelerate_interpolator" />
+
+    <alpha
+        android:duration="280"
+        android:fromAlpha="0.55" android:toAlpha="1.0"
+        android:interpolator="@android:anim/decelerate_interpolator" />
+</set>

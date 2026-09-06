@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 强度条分段：圆角胶囊，颜色由代码 backgroundTintList 控制 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="3dp"/>
+    <solid android:color="#8D97AB"/>
+</shape>

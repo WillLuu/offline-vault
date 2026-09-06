@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 编辑页·词条行（2026-09-06 v3）：
+     [词条名] ✎(改名，紧贴词条) ... ✕(删除)
+     [凹陷内容输入框]（常显可直接输入；备注行在代码里放大为多行）
+     词条模板全局同步：增删改词条影响所有密码卡片。由 EntryEditActivity 动态 inflate。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginTop="10dp"
+    android:clipChildren="false" android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:clipChildren="false" android:clipToPadding="false">
+
+        <TextView android:id="@+id/tvFieldLabel"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="13sp" android:textStyle="bold"
+            android:textColor="@color/on_surface_variant" />
+
+        <!-- 笔：紧挨词条右侧 → 重命名词条 -->
+        <TextView android:id="@+id/btnRenameField"
+            android:layout_width="28dp" android:layout_height="28dp"
+            android:layout_marginStart="2dp"
+            android:gravity="center"
+            android:text="✎" android:textSize="13sp"
+            android:textColor="?attr/colorPrimary"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/edit_rename_field"
+            android:clickable="true" android:focusable="true" />
+
+        <View
+            android:layout_width="0dp" android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView android:id="@+id/btnDeleteField"
+            android:layout_width="34dp" android:layout_height="34dp"
+            android:gravity="center"
+            android:text="✕" android:textSize="14sp"
+            android:textColor="@color/on_surface_variant"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/edit_delete_field"
+            android:clickable="true" android:focusable="true" />
+    </LinearLayout>
+
+    <!-- 内容输入框：常显（可直接填写），凹陷样式 -->
+    <com.qiqiao.passwordvault.ui.common.NeuSurface
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        app:neuDirection="inset" app:neuElevation="xs"
+        app:neuCornerRadius="@dimen/radius_field">
+
+        <EditText android:id="@+id/etFieldValue"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:minHeight="44dp"
+            android:background="@android:color/transparent"
+            android:paddingStart="12dp" android:paddingEnd="12dp"
+            android:inputType="text" android:importantForAutofill="no"
+            android:textColor="@color/on_surface" />
+    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+</LinearLayout>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 可点击凸卡（真双影 + 圆角 ripple 按压反馈）：
+     内容 = bg_soft_raised（右下深影 + 左上亮影 + 同色主层内缩出影）；mask 圆角约束水波。 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#26635BFF">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/radius_card" />
+        </shape>
+    </item>
+    <item android:drawable="@drawable/bg_soft_raised" />
+</ripple>

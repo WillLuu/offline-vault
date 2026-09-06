@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SOFT UI 主题属性集：新拟态组件（凸卡/内嵌输入/双影按钮/轨道）消费这些属性，
+     由三个主题（light 自动 / dark 自动 / Morandi 运行时）分别赋值 → 组件随主题换肤。
+     M3 语义色（colorPrimary/colorSurface/colorOnSurface/colorOnSurfaceVariant/colorOutline/colorError）
+     直接复用主题 item，不在此重复声明。 -->
+<resources>
+    <!-- 双影基色（新拟态核心：一亮一暗） -->
+    <attr name="pwdShadowDark" format="color" />
+    <attr name="pwdShadowLight" format="color" />
+
+    <!-- 双影渐变衰减端（同色 00 alpha）：layer-list 阴影层需"实色 → 透明"渐变模拟模糊，
+         逐主题提供，避免用透明黑插值导致阴影发灰。 -->
+    <attr name="pwdShadowDarkFade" format="color" />
+    <attr name="pwdShadowLightFade" format="color" />
+
+    <!-- 凹陷区文字（内嵌输入框内用更深文字保对比，SOFT UI -text-in） -->
+    <attr name="pwdTextIn" format="color" />
+
+    <!-- 内嵌元素（输入框/凹槽）底色与描边：比页面底色深一档，形成下沉感 -->
+    <attr name="pwdInsetBg" format="color" />
+    <attr name="pwdInsetBorder" format="color" />
+
+    <!-- NeuSurface 主面渐变端（凸起：左上亮→右下暗；凹陷反向） -->
+    <attr name="pwdRaisedHi" format="color" />
+    <attr name="pwdRaisedLo" format="color" />
+    <attr name="pwdInsetHi" format="color" />
+    <attr name="pwdInsetLo" format="color" />
+
+    <!-- 语义色（M3 无对应：成功/警告） -->
+    <attr name="pwdSuccess" format="color" />
+    <attr name="pwdWarning" format="color" />
+
+    <!-- 粒子背景前景/光晕（随主题） -->
+    <attr name="pwdParticle" format="color" />
+    <attr name="pwdParticleGlow" format="color" />
+
+    <!-- NeuSurface 自定义属性（新拟态真高斯模糊双影，由 NeuSurface.kt 消费） -->
+    <declare-styleable name="NeuSurface">
+        <!-- 0 = ROUND_RECT（默认），1 = CIRCLE -->
+        <attr name="neuShape" format="enum">
+            <enum name="rect" value="0" />
+            <enum name="circle" value="1" />
+        </attr>
+        <!-- 0 = NONE，1 = XS (3/6)，2 = SM (5/10)，3 = LG (9/18) -->
+        <attr name="neuElevation" format="enum">
+            <enum name="none" value="0" />
+            <enum name="xs" value="1" />
+            <enum name="sm" value="2" />
+            <enum name="lg" value="3" />
+        </attr>
+        <!-- 0 = RAISED（默认，凸起），1 = INSET（凹陷） -->
+        <attr name="neuDirection" format="enum">
+            <enum name="raised" value="0" />
+            <enum name="inset" value="1" />
+        </attr>
+        <!-- 圆角；CIRCLE 形状下无效 -->
+        <attr name="neuCornerRadius" format="dimension" />
+    </declare-styleable>
+</resources>

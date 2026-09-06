@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导入备份页（新拟态真高斯模糊版）：顶栏 + 主卡（NeuSurface RAISED） + 各输入项独立 NeuSurface INSET -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="?android:attr/colorBackground"
+    android:clipChildren="false" android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingLeft="@dimen/space_md" android:paddingRight="@dimen/space_md"
+        android:paddingTop="@dimen/space_sm" android:paddingBottom="@dimen/space_sm"
+        android:clipChildren="false" android:clipToPadding="false">
+
+        <com.qiqiao.passwordvault.ui.common.NeuSurface
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            app:neuShape="circle"
+            app:neuDirection="raised"
+            app:neuElevation="sm">
+
+            <ImageButton android:id="@+id/btnBack"
+                android:layout_width="40dp" android:layout_height="40dp"
+                android:background="@android:color/transparent"
+                android:src="@drawable/ic_back_24" android:contentDescription="@string/common_cancel" />
+        </com.qiqiao.passwordvault.ui.common.NeuSurface>
+
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:layout_marginStart="@dimen/space_sm"
+            android:text="@string/import_title" android:textSize="@dimen/text_large"
+            android:textStyle="bold" android:textColor="@color/on_surface" />
+    </LinearLayout>
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipChildren="false" android:clipToPadding="false">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="@dimen/space_md"
+            android:clipChildren="false" android:clipToPadding="false">
+
+            <com.qiqiao.passwordvault.ui.common.NeuSurface
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                app:neuDirection="raised"
+                app:neuElevation="sm"
+                app:neuCornerRadius="@dimen/radius_card">
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:padding="16dp" android:clipChildren="false" android:clipToPadding="false">
+
+                    <com.qiqiao.passwordvault.ui.common.NeuSurface
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        app:neuDirection="raised"
+                        app:neuElevation="xs"
+                        app:neuCornerRadius="@dimen/radius_field">
+
+                        <Button android:id="@+id/btnChoose"
+                            android:layout_width="match_parent" android:layout_height="44dp"
+                            android:background="@android:color/transparent"
+                            android:text="@string/import_choose" android:textAllCaps="false"
+                            android:textColor="@color/on_surface" />
+                    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+
+                    <TextView android:id="@+id/tvFileName"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textColor="@color/on_surface_variant" android:layout_marginTop="@dimen/space_sm" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_md"
+                        android:text="@string/import_password" android:labelFor="@id/etPassword"
+                        android:textColor="@color/on_surface_variant" />
+                    <com.qiqiao.passwordvault.ui.common.NeuSurface
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        app:neuDirection="inset" app:neuElevation="xs"
+                        app:neuCornerRadius="@dimen/radius_field">
+
+                        <EditText android:id="@+id/etPassword"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:minHeight="44dp"
+                            android:background="@android:color/transparent"
+                            android:padding="12dp"
+                            android:inputType="textPassword" android:importantForAutofill="no" android:textColor="@color/on_surface" />
+                    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+
+                    <com.qiqiao.passwordvault.ui.common.NeuSurface
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_md"
+                        app:neuDirection="raised"
+                        app:neuElevation="lg"
+                        app:neuCornerRadius="@dimen/radius_pill">
+
+                        <Button android:id="@+id/btnImport"
+                            android:layout_width="match_parent" android:layout_height="52dp"
+                            android:background="@android:color/transparent"
+                            android:textColor="?attr/colorOnPrimary" android:textSize="16sp"
+                            android:text="@string/import_btn" android:textAllCaps="false" />
+                    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+
+                    <!-- 合并报告（凹陷结果面板）：导入完成后显示，与新拟态层级一致 -->
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_lg" android:text="@string/import_report"
+                        android:textStyle="bold" android:textColor="@color/on_surface" />
+                    <com.qiqiao.passwordvault.ui.common.NeuSurface
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        app:neuDirection="inset"
+                        app:neuCornerRadius="@dimen/radius_soft">
+
+                        <TextView android:id="@+id/tvReport"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:padding="12dp"
+                            android:textColor="@color/on_surface" android:textSize="14sp"
+                            android:visibility="gone" />
+                    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+                </LinearLayout>
+            </com.qiqiao.passwordvault.ui.common.NeuSurface>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

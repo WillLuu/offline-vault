@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 新拟态凸起胶囊（表面色，用于次按钮 / 分段选中浮块）：双影 + surface 填充；按压下沉。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="315"
+                        android:startColor="?attr/pwdShadowLight"
+                        android:endColor="?attr/pwdShadowLightFade" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="135"
+                        android:startColor="?attr/pwdShadowDark"
+                        android:endColor="?attr/pwdShadowDarkFade" />
+                </shape>
+            </item>
+            <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="?android:attr/colorBackground" />
+                    <corners android:radius="24dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="315"
+                        android:startColor="?attr/pwdShadowDark"
+                        android:endColor="?attr/pwdShadowDarkFade" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/radius_pill" />
+                    <gradient android:angle="135"
+                        android:startColor="?attr/pwdShadowLight"
+                        android:endColor="?attr/pwdShadowLightFade" />
+                </shape>
+            </item>
+            <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="?android:attr/colorBackground" />
+                    <corners android:radius="24dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

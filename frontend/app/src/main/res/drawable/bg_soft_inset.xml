@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 新拟态凹陷（真双影内陷）：亮影在右下、深影在左上（与凸起相反）+ 主层下沉色 pwdInsetBg。
+     用于输入框/凹槽。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/radius_field" />
+            <gradient
+                android:angle="315"
+                android:startColor="?attr/pwdShadowLight"
+                android:endColor="?attr/pwdShadowLightFade" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/radius_field" />
+            <gradient
+                android:angle="135"
+                android:startColor="?attr/pwdShadowDark"
+                android:endColor="?attr/pwdShadowDarkFade" />
+        </shape>
+    </item>
+    <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="?android:attr/colorBackground" />
+            <corners android:radius="9dp" />
+        </shape>
+    </item>
+</layer-list>

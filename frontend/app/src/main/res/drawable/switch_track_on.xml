@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 生物识别开关轨道（开启态）：天蓝色小圆柱 + 深色内圈描边模拟凹陷 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp"/>
+            <solid android:color="#4FC3F7"/>
+            <stroke android:width="2dp" android:color="#A8B4C4"/>
+        </shape>
+    </item>
+    <!-- 顶部内阴影感：上缘深色半透明薄层 -->
+    <item android:top="0dp" android:bottom="10dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp"/>
+            <solid android:color="#223A4A6B"/>
+        </shape>
+    </item>
+</layer-list>

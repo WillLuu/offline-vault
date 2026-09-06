@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- DayNight 主题：自动按 values / values-night 取色，列表页浅/深两版由此满足 -->
+    <style name="Theme.PasswordVault" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorError">@color/error</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <!-- SOFT UI 属性（浅色段；深色由 values-night/themes? 不——DayNight 自动按 uiMode 取色，
+             但本 style 位于 values/，浅/深由引用的 @color 资源限定符自动切换（编译期 item 引用运行时解析） -->
+        <item name="pwdShadowDark">@color/shadow_dark</item>
+        <item name="pwdShadowLight">@color/shadow_light</item>
+        <item name="pwdShadowDarkFade">@color/shadow_dark_fade</item>
+        <item name="pwdShadowLightFade">@color/shadow_light_fade</item>
+        <item name="pwdTextIn">@color/text_in</item>
+        <item name="pwdSuccess">@color/success</item>
+        <item name="pwdWarning">@color/warning</item>
+        <item name="pwdParticle">@color/particle</item>
+        <item name="pwdParticleGlow">@color/particle_glow</item>
+        <item name="pwdInsetBg">@color/inset_bg</item>
+        <item name="pwdInsetBorder">@color/inset_border</item>
+        <!-- ponytail: 使用系统默认字体（多数设备即 Noto Sans SC） | 升级阈值：需要内置字体资源时再打包 font -->
+    </style>
+
+    <!-- Morandi 第三主题（SOFT UI 规范 morandi 段）：继承浅色资源基调 + 覆盖全套角色色为莫兰迪低饱和组。
+         由 PwdBaseActivity 在 setContentView 前 setTheme 应用（morandi 无系统限定符，必须运行时换肤）。
+         关键：parent Theme.PasswordVault 的 DayNight 在 morandi 下需强制 NIGHT_NO（ThemePrefs 保证）。 -->
+    <style name="Theme.PasswordVault.Morandi" parent="Theme.PasswordVault">
+        <item name="colorPrimary">@color/morandi_primary</item>
+        <item name="colorOnPrimary">@color/morandi_on_primary</item>
+        <item name="colorPrimaryContainer">@color/morandi_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/morandi_on_primary_container</item>
+        <item name="android:colorBackground">@color/morandi_bg</item>
+        <item name="colorSurface">@color/morandi_surface</item>
+        <item name="colorOnSurface">@color/morandi_text</item>
+        <item name="colorOnSurfaceVariant">@color/morandi_sub</item>
+        <item name="colorOutline">@color/morandi_outline</item>
+        <item name="colorError">@color/morandi_error</item>
+        <item name="colorSecondary">@color/morandi_sub</item>
+        <item name="android:statusBarColor">@color/morandi_bg</item>
+        <item name="android:navigationBarColor">@color/morandi_bg</item>
+        <item name="android:windowBackground">@color/morandi_bg</item>
+        <!-- SOFT UI 属性（Morandi 段覆盖为莫兰迪色） -->
+        <item name="pwdShadowDark">@color/morandi_shadow_dark</item>
+        <item name="pwdShadowLight">@color/morandi_shadow_light</item>
+        <item name="pwdShadowDarkFade">@color/morandi_shadow_dark_fade</item>
+        <item name="pwdShadowLightFade">@color/morandi_shadow_light_fade</item>
+        <item name="pwdTextIn">@color/morandi_text_in</item>
+        <item name="pwdSuccess">@color/morandi_success</item>
+        <item name="pwdWarning">@color/morandi_warning</item>
+        <item name="pwdParticle">@color/morandi_sub</item>
+        <item name="pwdParticleGlow">@color/morandi_shadow_dark</item>
+        <item name="pwdInsetBg">@color/morandi_inset_bg</item>
+        <item name="pwdInsetBorder">@color/morandi_inset_border</item>
+        <!-- Morandi NeuSurface 主面渐变（#F2EBE3 亮→#B0A89E 暗 凸起；反向凹陷） -->
+        <item name="pwdRaisedHi">@color/morandi_raised_hi</item>
+        <item name="pwdRaisedLo">@color/morandi_raised_lo</item>
+        <item name="pwdInsetHi">@color/morandi_inset_hi</item>
+        <item name="pwdInsetLo">@color/morandi_inset_lo</item>
+    </style>
+</resources>

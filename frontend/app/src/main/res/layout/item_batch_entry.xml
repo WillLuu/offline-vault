@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 批量录入：单条解析结果预览（可编辑修正） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_batch_card"
+    android:padding="12dp"
+    android:layout_marginBottom="@dimen/space_12">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <CheckBox
+            android:id="@+id/cbInclude"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true" />
+
+        <TextView
+            android:id="@+id/tvIndex"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/on_surface_variant"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvPreview"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/on_surface_variant"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/etName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:minHeight="40dp"
+        android:background="@android:color/transparent"
+        android:hint="@string/batch_hint_name"
+        android:textColor="@color/on_surface"
+        android:textSize="14sp"
+        android:inputType="text" />
+
+    <EditText
+        android:id="@+id/etUsername"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="40dp"
+        android:background="@android:color/transparent"
+        android:hint="@string/batch_hint_username"
+        android:textColor="@color/on_surface"
+        android:textSize="14sp"
+        android:inputType="text" />
+
+    <EditText
+        android:id="@+id/etPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="40dp"
+        android:background="@android:color/transparent"
+        android:hint="@string/batch_hint_password"
+        android:textColor="@color/on_surface"
+        android:textSize="14sp"
+        android:inputType="textVisiblePassword" />
+
+    <EditText
+        android:id="@+id/etWebsite"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="40dp"
+        android:background="@android:color/transparent"
+        android:hint="@string/batch_hint_website"
+        android:textColor="@color/on_surface"
+        android:textSize="14sp"
+        android:inputType="textUri" />
+
+    <EditText
+        android:id="@+id/etCategory"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="40dp"
+        android:background="@android:color/transparent"
+        android:hint="@string/batch_hint_category"
+        android:textColor="@color/on_surface"
+        android:textSize="14sp"
+        android:inputType="text" />
+
+    <EditText
+        android:id="@+id/etNotes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="40dp"
+        android:background="@android:color/transparent"
+        android:hint="@string/batch_hint_notes"
+        android:textColor="@color/on_surface"
+        android:textSize="14sp"
+        android:inputType="textMultiLine" />
+</LinearLayout>

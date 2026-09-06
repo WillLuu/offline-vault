@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分类分段轨道（SPEC §3.3 seg 轨道）：玻璃浅槽 r11，白浮块（chip_bg selected）在上滑动视觉 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/inset_bg" />
+    <corners android:radius="@dimen/radius_seg" />
+</shape>

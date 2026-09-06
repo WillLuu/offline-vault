@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导航前进·进入（2026-09-06 用户需求：方向感知左右滑动）：
+     往导航序号更大的页面切（如 主页→数据）＝前进：新页从右侧滑入，整体左移。 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false"
+    android:fillAfter="false">
+
+    <translate
+        android:duration="280"
+        android:fromXDelta="100%p" android:toXDelta="0"
+        android:interpolator="@android:anim/decelerate_interpolator" />
+</set>

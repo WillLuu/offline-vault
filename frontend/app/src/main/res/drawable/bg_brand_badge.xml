@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 品牌渐变圆徽：与 launcher 图标背景同源渐变（浅紫→深紫），作为解锁页品牌图形底。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:type="linear"
+        android:angle="315"
+        android:startColor="#7A72FF"
+        android:endColor="#4B43D9" />
+</shape>

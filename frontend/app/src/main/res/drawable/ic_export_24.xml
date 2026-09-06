@@ -1,0 +1,9 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- 导出 = 向上箭头 + 底部托盘（2026-09-06 用户需求：与导入的向下箭头做方向区分；
+         原图标与 ic_import_24 同为向下箭头，仅路径绕线相反，肉眼无法区分）。
+         几何为 ic_import_24 箭头部分的垂直镜像（y' = 21 - y），托盘行两者完全一致。 -->
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M5,20h14v-2H5V20zM11,17h2V9h4l-5,-5 -5,5h4v8z" />
+</vector>
