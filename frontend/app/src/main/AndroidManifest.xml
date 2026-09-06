@@ -20,7 +20,9 @@
         </activity>
         <activity android:name=".ui.list.PasswordListActivity" android:exported="false" />
         <activity android:name=".ui.detail.EntryDetailActivity" android:exported="false" />
-        <activity android:name=".ui.edit.EntryEditActivity" android:exported="false" />
+        <!-- adjustResize（2026-09-06 修复）：默认 pan 会让键盘把整窗顶出屏幕、顶部保存按钮"消失" -->
+        <activity android:name=".ui.edit.EntryEditActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ui.generator.PasswordGeneratorActivity" android:exported="false" />
         <activity android:name=".ui.category.CategoryManageActivity" android:exported="false" />
         <activity android:name=".ui.settings.SettingsActivity" android:exported="false" />

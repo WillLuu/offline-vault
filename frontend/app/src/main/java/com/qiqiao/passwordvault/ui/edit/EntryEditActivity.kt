@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
@@ -50,6 +51,9 @@ class EntryEditActivity : PwdBaseActivity() {
 
     private val fieldRows = mutableListOf<FieldRow>()
 
+    // 密码明文揭示态（2026-09-06 用户需求：编辑时可见密码，核对是否改对）
+    private var pwRevealed = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_entry_edit)
@@ -74,6 +78,27 @@ class EntryEditActivity : PwdBaseActivity() {
             )
         }
         findViewById<Button>(R.id.btnSave).setOnClickListener { save() }
+        // 底部常驻保存栏（2026-09-06 用户需求）：长表单滚到下方也能直接保存，同一 handler
+        findViewById<Button>(R.id.btnSaveBottom).setOnClickListener { save() }
+
+        // 密码显隐眼睛（2026-09-06 用户需求）：默认掩码，点眼切明文核对；视觉态与列表卡/详情页 eye 一致
+        val btnEyePw = findViewById<ImageButton>(R.id.btnEyePw)
+        val eyePwContainer = findViewById<com.qiqiao.passwordvault.ui.common.NeuSurface>(R.id.eyeContainerPw)
+        btnEyePw.setOnClickListener {
+            pwRevealed = !pwRevealed
+            etPassword.inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                if (pwRevealed) android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                else android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            etPassword.setSelection(etPassword.text.length) // inputType 切换后光标回末尾
+            eyePwContainer.direction = if (pwRevealed)
+                com.qiqiao.passwordvault.ui.common.NeuSurface.Direction.INSET
+            else com.qiqiao.passwordvault.ui.common.NeuSurface.Direction.RAISED
+            btnEyePw.imageTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(this,
+                    if (pwRevealed) R.color.primary else R.color.on_surface_variant))
+            btnEyePw.contentDescription = getString(
+                if (pwRevealed) R.string.detail_hide else R.string.detail_show)
+        }
 
         Vault.data.listCategories { res ->
             res.onSuccess { cats ->

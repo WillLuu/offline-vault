@@ -114,6 +114,26 @@
                             android:inputType="textPassword" android:importantForAutofill="no" android:textColor="@color/on_surface" />
                     </com.qiqiao.passwordvault.ui.common.NeuSurface>
 
+                    <!-- 密码显隐切换（2026-09-06 用户需求）：默认掩码，点眼查看明文；
+                         交互与列表卡/详情页 eye 一致（揭示态凹陷 + primary 着色，代码切换） -->
+                    <com.qiqiao.passwordvault.ui.common.NeuSurface
+                        android:id="@+id/eyeContainerPw"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_xs"
+                        app:neuShape="circle"
+                        app:neuDirection="raised"
+                        app:neuElevation="xs">
+
+                        <ImageButton android:id="@+id/btnEyePw"
+                            android:layout_width="44dp" android:layout_height="44dp"
+                            android:padding="10dp"
+                            android:background="@android:color/transparent"
+                            android:src="@drawable/ic_eye_24"
+                            android:scaleType="fitCenter"
+                            android:contentDescription="@string/detail_show"
+                            app:tint="@color/on_surface_variant" />
+                    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+
                     <com.qiqiao.passwordvault.ui.common.NeuSurface
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_xs"
@@ -164,6 +184,26 @@
             </LinearLayout>
         </com.qiqiao.passwordvault.ui.common.NeuSurface>
     </ScrollView>
+
+    <!-- 底部常驻保存栏（2026-09-06 用户需求）：长表单/键盘弹起时始终可见可点，
+         与顶部保存同一 handler；样式复刻顶部保存按钮（NeuSurface raised + 透明 Button），仅撑满宽度 -->
+    <com.qiqiao.passwordvault.ui.common.NeuSurface
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginLeft="4dp" android:layout_marginRight="4dp"
+        android:layout_marginBottom="6dp"
+        app:neuDirection="raised"
+        app:neuElevation="sm"
+        app:neuCornerRadius="@dimen/radius_field"
+        android:clipChildren="false" android:clipToPadding="false">
+
+        <Button android:id="@+id/btnSaveBottom"
+            android:layout_width="match_parent" android:layout_height="44dp"
+            android:layout_margin="6dp"
+            android:background="@android:color/transparent"
+            android:textColor="?attr/colorOnPrimary"
+            android:text="@string/edit_save" android:textAllCaps="false"
+            android:textStyle="bold" />
+    </com.qiqiao.passwordvault.ui.common.NeuSurface>
 
     <!-- 底部导航（2026-09-06）：主页 / 数据管理 / ＋新增(当前) / 设置；新增/编辑共用本页 -->
     <com.qiqiao.passwordvault.ui.common.NeuSurface
