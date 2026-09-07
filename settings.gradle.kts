@@ -24,5 +24,6 @@ rootProject.name = "offline-vault"
 include(":vault-core")
 include(":vault-android")
 include(":vault-desktop")
+include(":app-desktop")
 include(":app-android")
 project(":app-android").projectDir = file("frontend")
