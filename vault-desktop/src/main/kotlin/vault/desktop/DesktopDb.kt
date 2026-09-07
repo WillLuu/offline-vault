@@ -54,7 +54,12 @@ class DesktopDb private constructor(val connection: Connection, val dbFile: File
 
         /** 打开（或创建）数据库：v0 建表；版本低于 DESKTOP_DB_VERSION 走迁移段。 */
         fun open(dbFile: File = File(defaultDataDir(), "vault.db")): DesktopDb {
+            val firstRun = dbFile.parentFile?.let { !it.exists() } ?: false
             dbFile.parentFile?.mkdirs()
+            if (firstRun && dbFile.parentFile?.isDirectory == true) {
+                // M6（PRD §5.1）：数据目录仅当前用户 + SYSTEM 可访问（尽力而为，失败退化为默认 ACL）
+                DesktopSecurity.hardenDataDir(dbFile.parentFile)
+            }
             val conn = DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}")
             conn.autoCommit = true
             val db = DesktopDb(conn, dbFile)

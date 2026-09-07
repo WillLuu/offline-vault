@@ -1,3 +1,5 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
     kotlin("jvm")
     id("org.jetbrains.compose")
@@ -24,12 +26,26 @@ dependencies {
     implementation(compose.materialIconsExtended)
     implementation(compose.foundation)
     implementation(compose.runtime)
+
+    // 桌面 Dispatchers.Main 提供者（经 ServiceLoader 发现；打包后必需，dev 运行同受益）
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
 }
 
-tasks.register<JavaExec>("run") {
-    group = "application"
-    description = "启动桌面应用"
-    mainClass.set("vault.desktop.app.MainKt")
-    classpath = sourceSets.named("main").get().runtimeClasspath
-    // 空闲锁/剪贴板等均走 AWT 主线程，无需额外参数
+// 官方桌面任务：./gradlew :app-desktop:run / createDistributable / packageDistributionForCurrentOS
+compose.desktop {
+    application {
+        mainClass = "vault.desktop.app.MainKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Msi, TargetFormat.Exe)
+            modules("java.sql", "jdk.unsupported", "java.management") // sqlite-jdbc 需 java.sql；BC/jna 相关需 jdk.unsupported
+            packageName = "offline-vault"
+            packageVersion = "1.0.1"
+            vendor = "Will (17deg)"
+            description = "Offline Vault - pure offline password manager (desktop)"
+            // 注意：MSI/EXE 安装包需本机安装 WiX 3.x；createDistributable（自包含目录）无需
+            windows {
+                dirChooser = true
+            }
+        }
+    }
 }
