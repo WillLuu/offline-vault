@@ -32,3 +32,15 @@ tasks.register<JavaExec>("desktopChecks") {
     mainClass.set("vault.desktop.DesktopContractChecksKt")
     classpath = desktopTestSourceSet.get().runtimeClasspath
 }
+
+// 桌面 CLI（M4 跨端互导实测 + 运维）：./gradlew :vault-desktop:runCli -q --args="stats <主密码>"
+val mainSourceSet = sourceSets.named("main")
+
+tasks.register<JavaExec>("runCli") {
+    group = "application"
+    description = "桌面命令行工具（init/stats/add/export/import），--args 传参"
+    mainClass.set("vault.desktop.DesktopCliKt")
+    classpath = mainSourceSet.get().runtimeClasspath
+    // 输出编码=系统原生（中文 Windows GBK），本机控制台显示正常；勿强设 UTF-8
+    standardInput = System.`in`
+}

@@ -9,6 +9,8 @@ import vault.SortKey
 import vault.checkThat
 import vault.AeadBlob
 import vault.decryptAesGcm
+import vault.parseVaultHeader
+import vault.WrongPasswordException
 
 // ============================================================================
 // DesktopContractChecks：桌面端存储/解锁自检（"自检即文档"约定，无测试框架，静默通过）。
@@ -125,7 +127,47 @@ fun main() {
     checkThat(lockedThrew) { "锁定态 listEntries 应抛 LockedException" }
     checkThat(vault.unlockWithPassword("master-pw-456")) { "重新解锁应成功" }
 
-    // ⑧ 失败限流（SEC-8）：先锁定会话 → 连续 5 次错误 → 冷却期内连正确密码也拒绝且 lockout>0
+    // ⑧ 备份导出/导入（F5/F6，跨端兼容的桌面侧验证——格式/合并决策与 Android 同走 core 代码）：
+    //    独立密码导出 → 新库导入（中文+extras 完整往返）；同库重导全 skipped；错误密码拒绝；
+    //    主密码同源导出（文件头 salt==登录 salt 铁证，同契约测试 checkExportImportMasterPassword）。
+    val cnId = vault.createEntry(EntryInput("网银", "张三", "cn-pw", "https://bank", "中文备注", socialId,
+        listOf(ExtraField("密保问题", "红色"))))
+    checkThat(cnId > 0) { "中文条目应可创建" }
+
+    val exportPw = "export-pw-8888"
+    val fileBytes = vault.exportVault(exportPw, useMasterPassword = false)
+    checkThat(String(fileBytes, 0, 4, Charsets.US_ASCII) == "VLT1") { ".vault magic 应为 VLT1" }
+
+    val vault2 = DesktopVault(File(tmpDir, "vault2.db"))
+    vault2.initializeMasterPassword("desktop-pw-2")
+    val report = vault2.importVault(fileBytes, exportPw)
+    checkThat(report.entriesAdded == 3) { "新库导入应新增 3 条（github/vpn/网银），实 ${report.entriesAdded}" }
+    val cnRow = vault2.listEntries(search = "网银").single()
+    val cn2 = vault2.getEntry(cnRow.id)!!
+    checkThat(cn2.password == "cn-pw" && cn2.notes == "中文备注") { "中文明文往返失败" }
+    checkThat(cn2.extras == listOf(ExtraField("密保问题", "红色"))) { "自定义词条跨库往返失败，实 ${cn2.extras}" }
+    checkThat(cn2.categoryName == "社交") { "分类名应随导入还原" }
+
+    // 同库重导同一文件 → 全 skipped（updated_at 相等取旧——"合并≠同步"语义基础，PRD R8 相关）
+    val report2 = vault2.importVault(fileBytes, exportPw)
+    checkThat(report2.entriesAdded == 0 && report2.entriesUpdated == 0 && report2.entriesSkipped == 3) {
+        "同库重导应全跳过，实 added=${report2.entriesAdded} updated=${report2.entriesUpdated} skipped=${report2.entriesSkipped}"
+    }
+
+    var wrongThrew = false
+    try { vault2.importVault(fileBytes, "bad-export-pw") } catch (e: WrongPasswordException) { wrongThrew = true }
+    checkThat(wrongThrew) { "错误导出密码应抛 WrongPasswordException" }
+
+    val sameFile = vault.exportVault("master-pw-456", useMasterPassword = true)
+    val header = parseVaultHeader(sameFile)
+    val loginSalt = vault.settings.getKdfMaterial()!!.second
+    checkThat(header.exportSalt.contentEquals(loginSalt)) { "主密码同源导出：文件头 salt 必须等于登录 salt" }
+    var sameThrew = false
+    try { vault2.importVault(sameFile, "wrong-master") } catch (e: WrongPasswordException) { sameThrew = true }
+    checkThat(sameThrew) { "同源文件用错误主密码导入应拒绝" }
+    vault2.close()
+
+    // ⑨ 失败限流（SEC-8）：先锁定会话 → 连续 5 次错误 → 冷却期内连正确密码也拒绝且 lockout>0
     vault.lock()
     repeat(5) { checkThat(!vault.unlockWithPassword("bad")) { "第 ${it + 1} 次错误密码应失败" } }
     checkThat(vault.lockoutRemainingMs() > 0) { "5 次失败后应进入冷却" }
@@ -134,5 +176,5 @@ fun main() {
 
     vault.close()
     tmpDir.deleteRecursively()
-    println("DESKTOP CHECKS OK (8 groups)")
+    println("DESKTOP CHECKS OK (9 groups)")
 }

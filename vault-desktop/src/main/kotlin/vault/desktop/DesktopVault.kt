@@ -18,6 +18,7 @@ class DesktopVault(dbFile: File = DesktopDb.defaultVaultFile()) : AutoCloseable 
     private val entryDao = DesktopEntryDao(db.connection) { unlock.getActiveDek() }
     private val categoryDao = DesktopCategoryDao(db.connection)
     val settings: DesktopSettingsStore = DesktopSettingsStore(db.connection)
+    private val backup = DesktopBackup(db.connection, { unlock.getActiveDek() }, settings)
 
     // ---- 解锁 / 初始化（F1/F2） ----
     fun isInitialized(): Boolean = synchronized(db) { unlock.isInitialized() }
@@ -53,6 +54,15 @@ class DesktopVault(dbFile: File = DesktopDb.defaultVaultFile()) : AutoCloseable 
     // ---- 设置（F8/F9 存储侧） ----
     fun getSettings(): vault.AppSettings = synchronized(db) { settings.getSettings() }
     fun updateSettings(patch: vault.SettingsPatch): Boolean = synchronized(db) { settings.updateSettings(patch) }
+
+    // ---- 备份导出/导入（F5/F6，.vault 与 Android 双向兼容——格式/合并决策全走 core） ----
+    /** 导出全库为 .vault 字节。useMasterPassword=true 主密码同源；false 独立导出密码。会话须已解锁。 */
+    fun exportVault(password: String, useMasterPassword: Boolean): ByteArray =
+        synchronized(db) { backup.exportVault(password, useMasterPassword) }
+
+    /** 导入 .vault 并按 (name,username,分类) 合并、updated_at 取新。错误密码抛 WrongPasswordException。 */
+    fun importVault(fileBytes: ByteArray, password: String): vault.MergeReport =
+        synchronized(db) { backup.importVault(fileBytes, password) }
 
     override fun close() = db.close()
 }
