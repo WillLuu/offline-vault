@@ -21,8 +21,9 @@ else
 fi
 export PATH="$JAVA_HOME_UNIX/bin:$PATH"
 JAVA="java"
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-SRC="$ROOT/src/vault"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$ROOT/vault-core/src/main/kotlin/vault"
+TEST_SRC="$ROOT/vault-core/src/test/kotlin/vault"
 # 工作目录（需无中文/空格，规避 JVM 路径编码差异）；可用 WORK_DIR 覆盖（Windows 下传 C:/... 形式）。
 WORK_WIN="${WORK_DIR:-C:/Users/Will/.workbuddy/vault_work}"
 WORK_UNIX="$(to_unix "$WORK_WIN")"
@@ -32,7 +33,7 @@ mkdir -p "$WORK_UNIX"
 cp "$SRC/Assert.kt" "$SRC/Json.kt" "$SRC/models.kt" "$SRC/VaultCrypto.kt" \
    "$SRC/VaultFormat.kt" "$SRC/VaultMerge.kt" "$SRC/SqlBuilders.kt" \
    "$SRC/Schema.kt" "$SRC/VaultSession.kt" \
-   "$ROOT/tests/contract/ContractTests.kt" "$WORK_UNIX/"
+   "$TEST_SRC/ContractTests.kt" "$WORK_UNIX/"
 
 # 显式列出 jar（避免 K2JVMCompiler 把 libs/* 通配误当源码）。
 COMPILER_CP="$TOOLCHAIN/libs/kotlin-compiler-2.0.21.jar;$TOOLCHAIN/libs/kotlin-stdlib-2.0.21.jar;$TOOLCHAIN/libs/kotlin-reflect-2.0.21.jar;$TOOLCHAIN/libs/kotlin-script-runtime-2.0.21.jar;$TOOLCHAIN/libs/trove4j-1.0.20181211.jar;$TOOLCHAIN/libs/annotations-13.0.jar;$TOOLCHAIN/libs/kotlinx-coroutines-core-jvm-1.8.1.jar"

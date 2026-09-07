@@ -10,29 +10,31 @@
 
 ## 1. 模块结构
 
+> **2026-09-07 更新（PC 端 PRD M1/M2）**：源码已从 `backend/src/vault` 平面目录拆分为 Gradle 多模块，
+> 副作用隔离铁律升级为**模块级隔离**。本目录仅保留历史脚本与文档；类名、包名、契约全部不变。
+
 ```
-backend/
-├── src/vault/
-│   ├── Assert.kt            # 自检辅助（checkThat / assertBytesEq），无测试框架
-│   ├── Json.kt              # 手写 JSON 编解码（固定子集，无 kotlinx.serialization）
-│   ├── models.kt            # SortKey / *Row / *Input / *Report / SecretPlain / 异常
-│   ├── VaultCrypto.kt       # 加密原语：Argon2id / AES-256-GCM / wrap / verifier（纯）
-│   ├── VaultFormat.kt       # .vault 二进制格式 序列化/解析（纯）
-│   ├── VaultMerge.kt        # 导入合并决策 + 荷载编解码（纯）
-│   ├── SqlBuilders.kt       # 列表/分类查询 SQL 构造（纯，单一事实源）
-│   ├── Schema.kt            # DDL 单一事实源（纯，Android 与 JVM 测试共用）
-│   ├── VaultSession.kt      # 解锁会话 DEK 内存持有（纯，可在 JVM 测试）
-│   ├── VaultDbHelper.kt     # SQLiteOpenHelper，执行 Schema.kt 的 DDL（Android）
-│   ├── PasswordEntryDao.kt  # 密码条目 DAO（Android）
-│   ├── CategoryDao.kt       # 分类 DAO（含条目计数/不可删规则）（Android）
-│   ├── AppSettingsStore.kt  # 设置 + 密钥材料读取（Android）
-│   ├── VaultBackup.kt       # 导出/导入合并（Android）
-│   ├── BiometricKeystore.kt # Android Keystore 生物识别通道（Android，需 Keystore）
-│   ├── UnlockManager.kt     # 解锁/锁定会话（Android，组合 Session+Settings+Biometric）
-│   └── RealVaultData.kt     # VaultData 接口真实实现，桥接前端 UI 与 vault.* DAO（Android，同编译进 frontend app module）
-├── tests/contract/
-│   └── ContractTests.kt     # 机器可校验契约测试（纯 JVM + sqlite-jdbc，无框架）
-└── build_and_test.sh        # 本地 JVM 契约测试构建脚本
+（仓库根，多模块）
+├── vault-core/                  # 纯 JVM，零 android.* 依赖（桌面与 Android 共用）
+│   └── src/main/kotlin/vault/
+│       ├── Assert.kt            # 自检辅助（checkThat / assertBytesEq），无测试框架
+│       ├── Json.kt              # 手写 JSON 编解码（固定子集，无 kotlinx.serialization）
+│       ├── models.kt            # SortKey / *Row / *Input / *Report / SecretPlain / 异常
+│       ├── VaultCrypto.kt       # 加密原语：Argon2id / AES-256-GCM / wrap / verifier（纯）
+│       ├── VaultFormat.kt       # .vault 二进制格式 序列化/解析（纯）
+│       ├── VaultMerge.kt        # 导入合并决策 + 荷载编解码（纯）
+│       ├── SqlBuilders.kt       # 列表/分类查询 SQL 构造（纯，单一事实源）
+│       ├── Schema.kt            # DDL 单一事实源（纯，Android 与 JVM 测试共用）
+│       └── VaultSession.kt      # 解锁会话 DEK 内存持有（纯，可在 JVM 测试）
+│   └── src/test/kotlin/vault/
+│       └── ContractTests.kt     # 机器可校验契约测试（纯 JVM + sqlite-jdbc，无框架）
+├── vault-android/               # Android 胶水（依赖 vault-core）
+│   └── src/main/kotlin/
+│       ├── vault/               # VaultDbHelper / *Dao / AppSettingsStore / VaultBackup
+│       │                        # / BiometricKeystore / UnlockManager / AndroidExt
+│       └── com/qiqiao/passwordvault/{data,model}/   # VaultData 接口 / RealVaultData / UI 模型
+├── frontend/                    # Android 应用（module :app-android）
+└── backend/                     # 本目录：历史脚本 + 文档（build_and_test.sh 已指向新路径）
 ```
 
 **副作用隔离**（v1.3 铁律）：纯模块（`Assert/Json/models/VaultCrypto/VaultFormat/VaultMerge/SqlBuilders/Schema/VaultSession`）
