@@ -114,8 +114,12 @@ private fun ApplicationScope.TitleBar(ws: WindowState, onExit: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         NeuSurface(cornerRadius = 12.dp,
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)) {
-            Text("17°", color = neu.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)) {
+            androidx.compose.material3.Icon(
+                imageVector = fingerprintVector(neu.primary),
+                contentDescription = "秘匣",
+                modifier = Modifier.size(16.dp)
+            )
         }
         Spacer(Modifier.width(10.dp))
         Text("秘匣 · 密码保险库", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)

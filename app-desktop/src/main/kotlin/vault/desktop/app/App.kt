@@ -292,8 +292,12 @@ fun AppRoot(model: AppModel) {
 private fun BrandBadge(sizeDp: Int = 56) {
     val neu = LocalNeu.current
     NeuSurface(cornerRadius = sizeDp.dp,
-        contentPadding = PaddingValues((sizeDp * 0.28f).dp)) {
-        Text("17°", color = neu.primary, fontSize = (sizeDp * 0.42f).sp, fontWeight = FontWeight.Bold)
+        contentPadding = PaddingValues((sizeDp * 0.22f).dp)) {
+        androidx.compose.material3.Icon(
+            imageVector = fingerprintVector(neu.primary),
+            contentDescription = "秘匣",
+            modifier = Modifier.size((sizeDp * 0.55f).dp)
+        )
     }
 }
 
@@ -400,8 +404,12 @@ fun MainScreen(model: AppModel) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 22.dp)) {
                 NeuSurface(cornerRadius = 12.dp,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)) {
-                    Text("17°", color = neu.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)) {
+                    androidx.compose.material3.Icon(
+                        imageVector = fingerprintVector(neu.primary),
+                        contentDescription = "秘匣",
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
                 Spacer(Modifier.width(10.dp))
                 Text("秘匣", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
