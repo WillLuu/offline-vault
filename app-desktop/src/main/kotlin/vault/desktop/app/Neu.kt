@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,7 +33,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
@@ -49,133 +48,87 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.ui.graphics.Color.Companion.Black
-import androidx.compose.foundation.layout.fillMaxSize
 
 // ============================================================================
-// 新拟态组件库（Compose 移植版，参数=2026-09-06 定稿档）。
-//  - RAISED：暗影(+dx,+dy) 右下外晕 + 亮影(-dx,-dy) 左上外晕；面 = 左上 Hi → 右下 Lo 对角渐变
-//  - INSET：面 = 左上 Hi(深) → 右下 Lo(亮) 对角渐变 + 内阴影环带（暗在左上内壁、亮在右下内壁）
-//  - 阴影实现：CMP 1.6.11 桌面端无 BlurMaskFilter（Android 专属 API），改用
-//    「同心环带分层」模拟软阴影——逐层外扩/内收的 EvenOdd 环带 + 透明度递减，
-//    纯公开 DrawScope API，无 skiko 内部耦合。
-//  颜色全部来自 LocalNeu（逐字节移植 Android colors.xml + NeuShadowPrefs 定稿档）。
+// 新拟态组件库（逐参数移植 设计模板/templates/03_Neumorphism_新拟态.html）：
+//  - 面与底同色（--bg），立体感完全来自双向 box-shadow——CSS 阴影用
+//    「同心环带分层」模拟：EvenOdd 环带逐层外扩/内收 + 透明度衰减（近边浓、远边淡），
+//    纯公开 DrawScope API（CMP 1.6.11 桌面端无 BlurMaskFilter，已实测 jar 确认）。
+//  - 阴影规格（模板 CSS 变量）：
+//      d-out    9px 9px 18px   （.neu 卡/面板）
+//      d-out-sm 5px 5px 10px   （按钮）
+//      d-out-xs 3px 3px 6px    （小圆钮/禁用态）
+//      d-in     inset 6px 6px 12px  （凹陷输入）
+//      d-in-sm  inset 3px 3px 6px   （小凹陷）
+//  - 圆角：r-lg 26 / r-md 18 / r-sm 12 / r-full 999
+//  颜色全部来自 LocalNeu（逐字节移植 colors.xml + values-night）。
 // ============================================================================
 
 enum class NeuDir { Raised, Inset }
+enum class NeuElev { MD, SM, XS }
 
-data class NeuShadowSpec(
-    val ddx: Float, val ddy: Float,   // 暗影位移方向（55°）
-    val ldx: Float, val ldy: Float,   // 亮影位移方向（210°）
-    val stepPx: Float                 // 每层环带间距
-)
+private data class ShadowSpec(val offX: Float, val offY: Float, val blur: Float)
 
-@Composable
-private fun rememberShadowSpec(offset: Dp): NeuShadowSpec {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val offPx = with(density) { offset.toPx() }
-    val rad = Math.toRadians(55.0)
-    val radL = Math.toRadians(210.0)
-    return remember(offPx) {
-        NeuShadowSpec(
-            ddx = (offPx * Math.cos(rad)).toFloat(), ddy = (offPx * Math.sin(rad)).toFloat(),
-            ldx = (offPx * Math.cos(radL)).toFloat(), ldy = (offPx * Math.sin(radL)).toFloat(),
-            stepPx = with(density) { 1.dp.toPx() }
-        )
-    }
+private fun shadowSpec(elev: NeuElev): ShadowSpec = when (elev) {
+    NeuElev.MD -> ShadowSpec(9f, 9f, 18f)
+    NeuElev.SM -> ShadowSpec(5f, 5f, 10f)
+    NeuElev.XS -> ShadowSpec(3f, 3f, 6f)
 }
 
-/**
- * 同心环带软阴影：以 (shiftDx, shiftDy) 方向逐层偏移的 EvenOdd 环带，
- * j 越大偏移越深/越远、越淡；绘制顺序 j=layers → 1（贴边最后画、最浓）。
- */
+/** 同心环带软阴影：环带沿 (sx, sy) 逐层偏移，j 越大越深/淡；绘制顺序 j=layers→1（贴边最后、最浓）。 */
 private fun DrawScope.neuRing(
     w: Float, h: Float, r: Float,
-    shiftDx: Float, shiftDy: Float, stepPx: Float, layers: Int,
-    color: Color, maxAlpha: Float
+    sx: Float, sy: Float, blur: Float,
+    color: Color, edgeAlpha: Float, layers: Int = 10
 ) {
-    val pad = 60f
+    val pad = blur * 0.5f + 4f
     for (j in layers downTo 1) {
-        val sx = shiftDx * j * stepPx
-        val sy = shiftDy * j * stepPx
-        val a = maxAlpha * (1f - (j - 1f) / layers)
+        val t = j / layers.toFloat()
+        val ox = sx * t; val oy = sy * t
+        val a = edgeAlpha + (1f - edgeAlpha) * (1f - t)
         if (a <= 0.01f) continue
         val ring = Path().apply {
             fillType = PathFillType.EvenOdd
             addRect(Rect(-pad, -pad, w + pad, h + pad))
-            addRoundRect(RoundRect(sx, sy, w + sx, h + sy, CornerRadius(r, r)))
+            addRoundRect(RoundRect(ox, oy, w + ox, h + oy, CornerRadius(r, r)))
         }
-        drawPath(ring, color.copy(alpha = a))
+        drawPath(ring, color.copy(alpha = a.coerceIn(0f, 1f)))
     }
 }
 
 /**
- * 新拟态面板。RAISED 凸起（卡/按钮/顶栏），INSET 凹陷（输入框/密码槽）。
- * contentPadding：子内容与面板边缘的间距（需容纳环带，调用方给）。
+ * 新拟态面板：面 = 底色（与页面同色无缝），dir 选凸起/凹陷，elev 选阴影档位。
+ * RAISED：暗环右下 + 亮环左上（面最后画、盖住环带内侧）；
+ * INSET：面先画，暗带左上内壁 + 亮带右下内壁（clip 内逐层）。
  */
 @Composable
 fun NeuSurface(
-    dir: NeuDir,
+    dir: NeuDir = NeuDir.Raised,
+    elev: NeuElev = NeuElev.MD,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 16.dp,
-    offset: Dp = 3.dp,
-    alphaDark: Float = 0.8f,
-    alphaLight: Float = 0.5f,
-    layers: Int = 6,
+    cornerRadius: Dp = 18.dp,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit
 ) {
     val neu = LocalNeu.current
-    val spec = rememberShadowSpec(offset)
+    val spec = shadowSpec(elev)
     val rPx = with(androidx.compose.ui.platform.LocalDensity.current) { cornerRadius.toPx() }
 
     Box(
         modifier = modifier.drawBehind {
             val w = size.width; val h = size.height; val r = rPx
-            when (dir) {
-                NeuDir.Raised -> {
-                    // 暗影环（右下外晕，逐层外扩渐淡）
-                    neuRing(w, h, r, spec.ddx, spec.ddy, spec.stepPx, layers,
-                        neu.shadowDark, alphaDark * 0.85f)
-                    // 亮影环（左上外晕）
-                    neuRing(w, h, r, spec.ldx, spec.ldy, spec.stepPx, layers,
-                        neu.shadowLight, alphaLight)
-                    // 主面：对角渐变盖住环带内侧
-                    drawRoundRect(
-                        brush = Brush.linearGradient(
-                            colors = listOf(neu.raisedHi, neu.raisedLo),
-                            start = Offset.Zero, end = Offset(w, h)
-                        ),
-                        cornerRadius = CornerRadius(r, r)
-                    )
+            if (dir == NeuDir.Raised) {
+                neuRing(w, h, r, spec.offX, spec.offY, spec.blur, neu.shadowDark, 0.85f)
+                neuRing(w, h, r, -spec.offX, -spec.offY, spec.blur, neu.shadowLight, 0.9f)
+                drawRoundRect(neu.bg, topLeft = Offset.Zero, size = size, cornerRadius = CornerRadius(r, r))
+            } else {
+                drawRoundRect(neu.bg, topLeft = Offset.Zero, size = size, cornerRadius = CornerRadius(r, r))
+                val shape = Path().apply {
+                    addRoundRect(RoundRect(0f, 0f, w, h, CornerRadius(r, r)))
                 }
-
-                NeuDir.Inset -> {
-                    // 凹面：左上深 → 右下亮
-                    drawRoundRect(
-                        brush = Brush.linearGradient(
-                            colors = listOf(neu.insetHi, neu.insetLo),
-                            start = Offset.Zero, end = Offset(w, h)
-                        ),
-                        cornerRadius = CornerRadius(r, r)
-                    )
-                    // 内阴影环带：clip 进形状后逐层画（暗左上 / 亮右下）
-                    val shapePath = Path().apply {
-                        addRoundRect(RoundRect(0f, 0f, w, h, CornerRadius(r, r)))
-                    }
-                    val darkSpec = spec.copy(
-                        ddx = spec.ddx * 0.5f, ddy = spec.ddy * 0.5f,
-                        ldx = -spec.ldx * 0.0f, ldy = -spec.ldy * 0.0f
-                    )
-                    clipPath(shapePath) {
-                        neuRing(w, h, r, darkSpec.ddx, darkSpec.ddy, spec.stepPx, layers,
-                            neu.shadowDark, alphaDark * 0.9f)
-                    }
-                    clipPath(shapePath) {
-                        neuRing(w, h, r, -spec.ldx * 0.35f, -spec.ldy * 0.35f, spec.stepPx, layers,
-                            neu.shadowLight, alphaLight * 0.9f)
-                    }
+                clipPath(shape) {
+                    neuRing(w, h, r, spec.offX, spec.offY, spec.blur, neu.shadowDark, 0.9f)
+                    neuRing(w, h, r, -spec.offX, -spec.offY, spec.blur, neu.shadowLight, 0.9f)
                 }
             }
         }
@@ -184,9 +137,9 @@ fun NeuSurface(
     }
 }
 
-// ---------------- 常用新拟态控件 ----------------
+// ---------------- 常用新拟态控件（按钮=模板 .btn：d-out-sm + r-full + 正文色文字） ----------------
 
-/** 凹陷输入框（搜索/表单字段）。hint=占位文案；密码由调用方传 visualTransformation。 */
+/** 凹陷输入框（模板 mimic：d-in-sm + r-sm 12 + text-in 文字色）。 */
 @Composable
 fun NeuField(
     value: String,
@@ -201,7 +154,8 @@ fun NeuField(
     val neu = LocalNeu.current
     NeuSurface(
         dir = NeuDir.Inset,
-        cornerRadius = 16.dp,
+        elev = NeuElev.SM,
+        cornerRadius = 12.dp,
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
     ) {
@@ -219,7 +173,10 @@ fun NeuField(
             else VisualTransformation.None,
             keyboardOptions = keyboardOptions,
             decorationBox = { inner ->
-                Box(Modifier.defaultMinSize(minHeight = 22.dp), contentAlignment = Alignment.CenterStart) {
+                Box(
+                    Modifier.defaultMinSize(minHeight = 22.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
                     if (value.isEmpty()) {
                         Text(hint, color = neu.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium)
@@ -231,37 +188,42 @@ fun NeuField(
     }
 }
 
-/** 凸起胶囊按钮。danger=true 时文字标红（删除类）；enabled=false 降透明。onClick 为尾参。 */
+/** 凸起胶囊按钮（模板 .btn：d-out-sm + r-full；正文色文字，danger 红字）。 */
 @Composable
 fun NeuButton(
     text: String,
     modifier: Modifier = Modifier,
     danger: Boolean = false,
     enabled: Boolean = true,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 24.dp, vertical = 13.dp),
     onClick: () -> Unit
 ) {
     val neu = LocalNeu.current
     NeuSurface(
         dir = NeuDir.Raised,
-        cornerRadius = 22.dp,
+        elev = NeuElev.SM,
+        cornerRadius = 999.dp,
         modifier = modifier.alpha(if (enabled) 1f else 0.45f),
         contentPadding = contentPadding
     ) {
         Text(
             text,
-            color = if (danger) neu.error else neu.onPrimary,
-            fontWeight = FontWeight.Bold,
+            color = when {
+                !enabled -> neu.onSurfaceVariant
+                danger -> neu.error
+                else -> neu.onSurface
+            },
+            fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier
-                .clip(RoundedCornerShape(22.dp))
+                .clip(RoundedCornerShape(999.dp))
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(contentPadding)
         )
     }
 }
 
-/** 凸起圆钮（图标）。 */
+/** 凸起圆钮（XS 档小阴影）。 */
 @Composable
 fun NeuIconButton(
     onClick: () -> Unit,
@@ -271,6 +233,7 @@ fun NeuIconButton(
 ) {
     NeuSurface(
         dir = NeuDir.Raised,
+        elev = NeuElev.XS,
         cornerRadius = sizeDp / 2,
         modifier = modifier,
         contentPadding = PaddingValues(0.dp)
@@ -296,7 +259,7 @@ fun NeuTextButton(text: String, modifier: Modifier = Modifier, onClick: () -> Un
     )
 }
 
-// ---------------- 对话框壳：半透明遮罩 + 凸起圆角卡（新拟态弹窗统一外壳） ----------------
+// ---------------- 对话框壳：遮罩 + 凸起大圆角卡（r-lg 26） ----------------
 
 @Composable
 fun NeuDialogShell(
@@ -309,11 +272,10 @@ fun NeuDialogShell(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Black.copy(alpha = 0.35f))
+                .background(Color.Black.copy(alpha = 0.35f))
                 .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center
         ) {
-            // 内层阻断点击穿透（no-op clickable 消费事件）
             NeuSurface(
                 dir = NeuDir.Raised,
                 cornerRadius = 26.dp,
