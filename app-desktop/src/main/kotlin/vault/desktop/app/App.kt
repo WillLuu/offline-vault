@@ -277,7 +277,7 @@ fun AppRoot(model: AppModel) {
     // 全局提示条（凸起气泡）
     model.snackbar?.let { msg ->
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            NeuSurface(dir = NeuDir.Raised, cornerRadius = 14.dp,
+            NeuSurface(cornerRadius = 14.dp,
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)) {
                 Text(msg, color = neu.onSurface, fontSize = 13.sp)
             }
@@ -291,7 +291,7 @@ fun AppRoot(model: AppModel) {
 @Composable
 private fun BrandBadge(sizeDp: Int = 56) {
     val neu = LocalNeu.current
-    NeuSurface(dir = NeuDir.Raised, cornerRadius = sizeDp.dp,
+    NeuSurface(cornerRadius = sizeDp.dp,
         contentPadding = PaddingValues((sizeDp * 0.28f).dp)) {
         Text("17°", color = neu.primary, fontSize = (sizeDp * 0.42f).sp, fontWeight = FontWeight.Bold)
     }
@@ -306,7 +306,7 @@ fun UnlockScreen(model: AppModel) = if (!model.initialized) InitScreen(model) el
 private fun UnlockCard(model: AppModel, content: @Composable ColumnScope.() -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         NeuSurface(
-            dir = NeuDir.Raised, cornerRadius = 26.dp,
+            cornerRadius = 26.dp,
             modifier = Modifier.width(420.dp),
             contentPadding = PaddingValues(horizontal = 32.dp, vertical = 40.dp)
         ) {
@@ -395,11 +395,11 @@ fun MainScreen(model: AppModel) {
             modifier = Modifier
                 .width(230.dp)
                 .fillMaxHeight()
-                .background(neu.insetBg.copy(alpha = 0.4f))
+                .background(neu.sidebar)
                 .padding(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 22.dp)) {
-                NeuSurface(dir = NeuDir.Raised, cornerRadius = 12.dp,
+                NeuSurface(cornerRadius = 12.dp,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)) {
                     Text("17°", color = neu.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
@@ -428,7 +428,7 @@ fun MainScreen(model: AppModel) {
         }
 
         // 分隔
-        Box(Modifier.width(2.dp).fillMaxHeight().background(neu.insetBg.copy(alpha = 0.6f)))
+        Box(Modifier.width(2.dp).fillMaxHeight().background(neu.divider))
 
         // ========== 中栏：搜索 + 条目列表 ==========
         Column(
@@ -467,7 +467,7 @@ fun MainScreen(model: AppModel) {
         }
 
         // 分隔
-        Box(Modifier.width(2.dp).fillMaxHeight().background(neu.insetBg.copy(alpha = 0.6f)))
+        Box(Modifier.width(2.dp).fillMaxHeight().background(neu.divider))
 
         // ========== 右栏：详情 ==========
         DetailPane(
@@ -508,7 +508,7 @@ private fun NavItem(label: String, count: Int, selected: Boolean, onClick: () ->
     val neu = LocalNeu.current
     val bg = when {
         selected -> neu.primary.copy(alpha = 0.15f)
-        hovered -> neu.shadowLight.copy(alpha = 0.55f)
+        hovered -> neu.hoverBg
         else -> Color.Transparent
     }
     Row(
@@ -539,7 +539,7 @@ private fun EntryCard(entry: PasswordEntryRow, selected: Boolean, onClick: () ->
     val hovered by iso.collectIsHoveredAsState()
     val neu = LocalNeu.current
     NeuSurface(
-        dir = NeuDir.Raised, cornerRadius = 18.dp,
+        cornerRadius = 18.dp,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 5.dp)
@@ -548,7 +548,7 @@ private fun EntryCard(entry: PasswordEntryRow, selected: Boolean, onClick: () ->
         contentPadding = PaddingValues(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            NeuSurface(dir = NeuDir.Raised, elev = NeuElev.XS, cornerRadius = 12.dp,
+            NeuSurface(cornerRadius = 12.dp,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
                 Text(monogram(entry.name), color = neu.primary, fontWeight = FontWeight.Bold)
             }
@@ -644,7 +644,7 @@ private fun FieldRow(label: String, value: String, model: AppModel) {
                 value.ifBlank { "—" },
                 modifier = Modifier.weight(1f),
                 fontFamily = FontFamily.Monospace,
-                color = neu.textIn,
+                color = neu.onSurface,
                 fontSize = 15.sp
             )
             NeuIconButton(onClick = { model.copySecret(value, label) }, sizeDp = 36.dp) {
@@ -665,7 +665,7 @@ private fun PasswordRow(password: String, model: AppModel) {
                 if (revealed) password else maskPassword(),
                 modifier = Modifier.weight(1f),
                 fontFamily = FontFamily.Monospace,
-                color = if (revealed) neu.primary else neu.textIn,
+                color = if (revealed) neu.primary else neu.onSurface,
                 fontSize = 15.sp
             )
             NeuIconButton(onClick = { revealed = !revealed }, sizeDp = 36.dp) {
@@ -805,14 +805,14 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
             }
 
             Spacer(Modifier.height(18.dp))
-            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.insetBg))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
             Spacer(Modifier.height(14.dp))
             Text("修改主密码", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
             Spacer(Modifier.height(8.dp))
             NeuButton("修改主密码…") { msg = null; showChangePw = true }
 
             Spacer(Modifier.height(18.dp))
-            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.insetBg))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
             Spacer(Modifier.height(14.dp))
             Text("备份（与 Android 版 .vault 双向兼容）", fontSize = 15.sp,
                 fontWeight = FontWeight.Bold, color = neu.onSurface)

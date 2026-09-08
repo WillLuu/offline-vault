@@ -3,7 +3,11 @@ package vault.desktop.app
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -108,46 +113,61 @@ private fun ApplicationScope.TitleBar(ws: WindowState, onExit: () -> Unit) {
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        NeuSurface(dir = NeuDir.Raised, cornerRadius = 12.dp,
+        NeuSurface(cornerRadius = 12.dp,
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)) {
             Text("17°", color = neu.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(10.dp))
         Text("秘匣 · 密码保险库", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
         Spacer(Modifier.weight(1f))
-        // 最大化/还原
-        NeuSurface(dir = NeuDir.Raised, cornerRadius = 15.dp, contentPadding = PaddingValues(0.dp)) {
-            Text(
-                if (ws.placement == WindowPlacement.Maximized) "❐" else "□",
-                color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clickable {
-                        ws.placement = if (ws.placement == WindowPlacement.Maximized)
-                            WindowPlacement.Floating else WindowPlacement.Maximized
-                    },
-                textAlign = TextAlign.Center
-            )
+        // 最大化/还原（透明底，hover 浅灰）
+        val maxIso = remember { MutableInteractionSource() }
+        val maxHover by maxIso.collectIsHoveredAsState()
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .hoverable(maxIso)
+                .clickable(interactionSource = maxIso, indication = null) {
+                    ws.placement = if (ws.placement == WindowPlacement.Maximized)
+                        WindowPlacement.Floating else WindowPlacement.Maximized
+                }
+                .background(if (maxHover) neu.hoverBg else Color.Transparent, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(if (ws.placement == WindowPlacement.Maximized) "❐" else "□",
+                color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(8.dp))
-        // 最小化（JNA ShowWindow）
-        NeuSurface(dir = NeuDir.Raised, cornerRadius = 15.dp, contentPadding = PaddingValues(0.dp)) {
-            Text(
-                "─", color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clickable {
-                        java.awt.Window.getWindows().firstOrNull { it.isVisible }
-                            ?.let { minimizeWindow(it) }
-                    },
-                textAlign = TextAlign.Center
-            )
+        // 最小化（JNA ShowWindow；透明底，hover 浅灰）
+        val minIso = remember { MutableInteractionSource() }
+        val minHover by minIso.collectIsHoveredAsState()
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .hoverable(minIso)
+                .clickable(interactionSource = minIso, indication = null) {
+                    java.awt.Window.getWindows().firstOrNull { it.isVisible }
+                        ?.let { minimizeWindow(it) }
+                }
+                .background(if (minHover) neu.hoverBg else Color.Transparent, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("─", color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(8.dp))
-        // 关闭
-        NeuSurface(dir = NeuDir.Raised, cornerRadius = 15.dp, contentPadding = PaddingValues(0.dp)) {
+        // 关闭（hover 变红，Windows 惯例）
+        val closeIso = remember { MutableInteractionSource() }
+        val closeHover by closeIso.collectIsHoveredAsState()
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .hoverable(closeIso)
+                .clickable(interactionSource = closeIso, indication = null, onClick = onExit)
+                .background(if (closeHover) neu.error.copy(alpha = 0.9f) else Color.Transparent, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                "✕", color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
+                "✕", color = if (closeHover) Color.White else neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .size(30.dp)
                     .clickable(onClick = onExit),

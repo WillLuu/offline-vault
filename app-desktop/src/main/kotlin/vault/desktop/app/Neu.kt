@@ -1,24 +1,30 @@
 package vault.desktop.app
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,123 +35,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.animation.core.animateFloatAsState
 
 // ============================================================================
-// 新拟态组件库（逐参数移植 设计模板/templates/03_Neumorphism_新拟态.html）：
-//  - 面与底同色（--bg），立体感完全来自双向 box-shadow——CSS 阴影用
-//    「同心环带分层」模拟：EvenOdd 环带逐层外扩/内收 + 透明度衰减（近边浓、远边淡），
-//    纯公开 DrawScope API（CMP 1.6.11 桌面端无 BlurMaskFilter，已实测 jar 确认）。
-//  - 阴影规格（模板 CSS 变量）：
-//      d-out    9px 9px 18px   （.neu 卡/面板）
-//      d-out-sm 5px 5px 10px   （按钮）
-//      d-out-xs 3px 3px 6px    （小圆钮/禁用态）
-//      d-in     inset 6px 6px 12px  （凹陷输入）
-//      d-in-sm  inset 3px 3px 6px   （小凹陷）
-//  - 圆角：r-lg 26 / r-md 18 / r-sm 12 / r-full 999
-//  颜色全部来自 LocalNeu（逐字节移植 colors.xml + values-night）。
+// 组件库（2026-09-08 用户定稿：放弃纯新拟物，转「柔和现代混合风」）。
+//  - NeuSurface：白底大圆角面板 + 极浅投影（深色主题=深灰面板+细边框）
+//  - NeuField：白底 + 1dp 边框，聚焦变紫（一眼看出能输入）
+//  - NeuButton：主紫填充 + 白字，hover 变浅、按下缩放 0.96（微动效）
+//  - NeuIconButton：透明底，hover 浅灰圆底（Windows 11 标题栏风格）
+//  全部颜色来自 LocalNeu（浅/深双主题）。
 // ============================================================================
 
-enum class NeuDir { Raised, Inset }
-enum class NeuElev { MD, SM, XS }
-
-private data class ShadowSpec(val offX: Float, val offY: Float, val blur: Float)
-
-private fun shadowSpec(elev: NeuElev): ShadowSpec = when (elev) {
-    NeuElev.MD -> ShadowSpec(9f, 9f, 18f)
-    NeuElev.SM -> ShadowSpec(5f, 5f, 10f)
-    NeuElev.XS -> ShadowSpec(3f, 3f, 6f)
-}
-
-/** 同心环带软阴影：环带沿 (sx, sy) 逐层偏移，j 越大越深/淡；绘制顺序 j=layers→1（贴边最后、最浓）。 */
-private fun DrawScope.neuRing(
-    w: Float, h: Float, r: Float,
-    sx: Float, sy: Float, blur: Float,
-    color: Color, edgeAlpha: Float, layers: Int = 12
-) {
-    // 关键：环带随 t 外扩（模拟 CSS blur 的扩散），仅偏移不外扩会导致晕圈贴边不可见
-    val pad = blur * 1.6f + 6f
-    for (j in layers downTo 1) {
-        val t = j / layers.toFloat()
-        val grow = blur * 1.4f * t                       // 外扩最大 ≈ blur*1.4
-        val ox = sx * (0.25f + 0.75f * t)                // 偏移渐增（近边不从 0 突跳）
-        val oy = sy * (0.25f + 0.75f * t)
-        val a = edgeAlpha * (0.12f + 0.88f * (1f - t))   // 近边浓、远边淡（高斯式衰减）
-        if (a <= 0.01f) continue
-        val ring = Path().apply {
-            fillType = PathFillType.EvenOdd
-            addRect(Rect(-grow - pad, -grow - pad, w + grow + pad, h + grow + pad))
-            addRoundRect(RoundRect(ox, oy, w + ox, h + oy, CornerRadius(r + grow, r + grow)))
-        }
-        drawPath(ring, color.copy(alpha = a.coerceIn(0f, 1f)))
-    }
-}
-
-/**
- * 新拟态面板：面 = 底色（与页面同色无缝），dir 选凸起/凹陷，elev 选阴影档位。
- * RAISED：暗环右下 + 亮环左上（面最后画、盖住环带内侧）；
- * INSET：面先画，暗带左上内壁 + 亮带右下内壁（clip 内逐层）。
- */
+/** 白底圆角面板 + 极浅投影（替代原 Path 自绘阴影）。 */
 @Composable
 fun NeuSurface(
-    dir: NeuDir = NeuDir.Raised,
-    elev: NeuElev = NeuElev.MD,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 18.dp,
+    cornerRadius: Dp = 16.dp,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit
 ) {
     val neu = LocalNeu.current
-    val spec = shadowSpec(elev)
-    val rPx = with(androidx.compose.ui.platform.LocalDensity.current) { cornerRadius.toPx() }
-
-    Box(
-        modifier = modifier.drawBehind {
-            val w = size.width; val h = size.height; val r = rPx
-            if (dir == NeuDir.Raised) {
-                neuRing(w, h, r, spec.offX, spec.offY, spec.blur, neu.shadowDark, 0.85f)
-                neuRing(w, h, r, -spec.offX, -spec.offY, spec.blur, neu.shadowLight, 0.9f)
-                drawRoundRect(neu.bg, topLeft = Offset.Zero, size = size, cornerRadius = CornerRadius(r, r))
-            } else {
-                drawRoundRect(neu.bg, topLeft = Offset.Zero, size = size, cornerRadius = CornerRadius(r, r))
-                val shape = Path().apply {
-                    addRoundRect(RoundRect(0f, 0f, w, h, CornerRadius(r, r)))
-                }
-                clipPath(shape) {
-                    neuRing(w, h, r, spec.offX, spec.offY, spec.blur, neu.shadowDark, 0.9f)
-                    neuRing(w, h, r, -spec.offX, -spec.offY, spec.blur, neu.shadowLight, 0.9f)
-                }
-            }
-        }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(cornerRadius),
+        color = neu.surface,
+        shadowElevation = 2.dp,
+        border = if (androidx.compose.foundation.isSystemInDarkTheme())
+            BorderStroke(1.dp, neu.border) else null
     ) {
         Box(Modifier.padding(contentPadding)) { content() }
     }
 }
 
-// ---------------- 常用新拟态控件（按钮=模板 .btn：d-out-sm + r-full + 正文色文字） ----------------
-
-/** 凹陷输入框（模板 mimic：d-in-sm + r-sm 12 + text-in 文字色）。 */
+/** 凹陷输入框（现代版：白底 + 1dp 边框，聚焦变紫——一眼看出能输入）。 */
 @Composable
 fun NeuField(
     value: String,
@@ -158,12 +90,15 @@ fun NeuField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val neu = LocalNeu.current
-    NeuSurface(
-        dir = NeuDir.Inset,
-        elev = NeuElev.SM,
-        cornerRadius = 12.dp,
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+    val iso = remember { MutableInteractionSource() }
+    val focused by iso.collectIsFocusedAsState()
+    val borderColor = if (focused) neu.primary else neu.border
+
+    Box(
+        modifier = modifier
+            .background(neu.surface, RoundedCornerShape(10.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         BasicTextField(
             value = value,
@@ -171,13 +106,14 @@ fun NeuField(
             singleLine = singleLine,
             minLines = minLines,
             textStyle = TextStyle(
-                color = neu.textIn,
+                color = neu.onSurface,
                 fontSize = MaterialTheme.typography.bodyMedium.fontSize
             ),
             cursorBrush = SolidColor(neu.primary),
             visualTransformation = if (isPassword) PasswordVisualTransformation()
             else VisualTransformation.None,
             keyboardOptions = keyboardOptions,
+            interactionSource = iso,
             decorationBox = { inner ->
                 Box(
                     Modifier.defaultMinSize(minHeight = 22.dp),
@@ -194,7 +130,7 @@ fun NeuField(
     }
 }
 
-/** 凸起胶囊按钮（模板 .btn：d-out-sm + r-full；正文色文字，danger 红字）。 */
+/** 主操作按钮：主紫填充 + 白字；hover 变浅、按下缩放 0.96（微动效）。danger 红底。 */
 @Composable
 fun NeuButton(
     text: String,
@@ -205,31 +141,50 @@ fun NeuButton(
     onClick: () -> Unit
 ) {
     val neu = LocalNeu.current
-    NeuSurface(
-        dir = NeuDir.Raised,
-        elev = NeuElev.SM,
-        cornerRadius = 999.dp,
-        modifier = modifier.alpha(if (enabled) 1f else 0.45f),
-        contentPadding = contentPadding
+    val iso = remember { MutableInteractionSource() }
+    val hovered by iso.collectIsHoveredAsState()
+    val pressed by iso.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, label = "btnPressScale")
+
+    val bg = when {
+        !enabled -> neu.onSurfaceVariant.copy(alpha = 0.4f)
+        danger -> if (hovered) neu.error else neu.error.copy(alpha = 0.88f)
+        hovered -> neu.primary.copy(alpha = 0.85f)
+        else -> neu.primary
+    }
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(interactionSource = iso, indication = null, enabled = enabled, onClick = onClick)
+            .background(bg, RoundedCornerShape(12.dp))
+            .padding(contentPadding),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text,
-            color = when {
-                !enabled -> neu.onSurfaceVariant
-                danger -> neu.error
-                else -> neu.onSurface
-            },
+            color = if (enabled) neu.onPrimary else neu.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(contentPadding)
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }
 
-/** 凸起圆钮（XS 档小阴影）。 */
+/** 主操作按钮（强调填充 + 白字，宽度常为 fillMaxWidth）。 */
+@Composable
+fun PrimaryButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    NeuButton(text, modifier = modifier.fillMaxWidth(), enabled = enabled, onClick = onClick)
+}
+
+/** 圆形图标钮：透明底，hover 浅灰圆底 + 微缩放（Windows 11 标题栏风格）。 */
 @Composable
 fun NeuIconButton(
     onClick: () -> Unit,
@@ -237,35 +192,48 @@ fun NeuIconButton(
     sizeDp: Dp = 40.dp,
     content: @Composable () -> Unit
 ) {
-    NeuSurface(
-        dir = NeuDir.Raised,
-        elev = NeuElev.XS,
-        cornerRadius = sizeDp / 2,
-        modifier = modifier,
-        contentPadding = PaddingValues(0.dp)
-    ) {
-        Box(
-            modifier = Modifier.size(sizeDp).clickable(onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) { content() }
-    }
+    val neu = LocalNeu.current
+    val iso = remember { MutableInteractionSource() }
+    val hovered by iso.collectIsHoveredAsState()
+    val pressed by iso.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.94f else 1f, label = "iconPressScale")
+
+    Box(
+        modifier = modifier
+            .size(sizeDp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(interactionSource = iso, indication = null, onClick = onClick)
+            .hoverable(iso)
+            .background(
+                if (hovered) neu.hoverBg else Color.Transparent,
+                CircleShape
+            ),
+        contentAlignment = Alignment.Center
+    ) { content() }
 }
 
-/** 行内文字按钮（编辑/删除/取消等）。 */
+/** 行内文字按钮：hover 浅灰底。 */
 @Composable
 fun NeuTextButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val neu = LocalNeu.current
+    val iso = remember { MutableInteractionSource() }
+    val hovered by iso.collectIsHoveredAsState()
     Text(
         text,
-        color = LocalNeu.current.primary,
-        fontWeight = FontWeight.Bold,
+        color = neu.primary,
+        fontWeight = FontWeight.SemiBold,
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = iso, indication = null, onClick = onClick)
+            .hoverable(iso)
+            .background(if (hovered) neu.hoverBg else Color.Transparent, RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp)
     )
 }
 
-// ---------------- 对话框壳：遮罩 + 凸起大圆角卡（r-lg 26） ----------------
+// ---------------- 对话框壳：遮罩 + 白底大圆角卡（现代风弹窗统一外壳） ----------------
 
 @Composable
 fun NeuDialogShell(
@@ -283,8 +251,7 @@ fun NeuDialogShell(
             contentAlignment = Alignment.Center
         ) {
             NeuSurface(
-                dir = NeuDir.Raised,
-                cornerRadius = 26.dp,
+                cornerRadius = 16.dp,
                 modifier = Modifier.width(width),
                 contentPadding = PaddingValues(24.dp)
             ) {
@@ -294,33 +261,5 @@ fun NeuDialogShell(
                 )
             }
         }
-    }
-}
-
-// ---------------- 主操作按钮：强调色填充 + 白字 + hover 提亮（PC 可点击暗示） ----------------
-
-@Composable
-fun PrimaryButton(
-    text: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    val iso = remember { MutableInteractionSource() }
-    val hovered by iso.collectIsHoveredAsState()
-    val neu = LocalNeu.current
-    val bg = when {
-        !enabled -> neu.onSurfaceVariant.copy(alpha = 0.45f)
-        hovered -> neu.primary.copy(alpha = 0.82f)
-        else -> neu.primary
-    }
-    Box(
-        modifier = modifier
-            .clickable(interactionSource = iso, indication = null, enabled = enabled, onClick = onClick)
-            .background(bg, RoundedCornerShape(14.dp))
-            .padding(vertical = 13.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     }
 }
