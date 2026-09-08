@@ -2,6 +2,8 @@ package vault.desktop.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -47,6 +49,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
 // ============================================================================
@@ -79,18 +82,21 @@ private fun shadowSpec(elev: NeuElev): ShadowSpec = when (elev) {
 private fun DrawScope.neuRing(
     w: Float, h: Float, r: Float,
     sx: Float, sy: Float, blur: Float,
-    color: Color, edgeAlpha: Float, layers: Int = 10
+    color: Color, edgeAlpha: Float, layers: Int = 12
 ) {
-    val pad = blur * 0.5f + 4f
+    // 关键：环带随 t 外扩（模拟 CSS blur 的扩散），仅偏移不外扩会导致晕圈贴边不可见
+    val pad = blur * 1.6f + 6f
     for (j in layers downTo 1) {
         val t = j / layers.toFloat()
-        val ox = sx * t; val oy = sy * t
-        val a = edgeAlpha + (1f - edgeAlpha) * (1f - t)
+        val grow = blur * 1.4f * t                       // 外扩最大 ≈ blur*1.4
+        val ox = sx * (0.25f + 0.75f * t)                // 偏移渐增（近边不从 0 突跳）
+        val oy = sy * (0.25f + 0.75f * t)
+        val a = edgeAlpha * (0.12f + 0.88f * (1f - t))   // 近边浓、远边淡（高斯式衰减）
         if (a <= 0.01f) continue
         val ring = Path().apply {
             fillType = PathFillType.EvenOdd
-            addRect(Rect(-pad, -pad, w + pad, h + pad))
-            addRoundRect(RoundRect(ox, oy, w + ox, h + oy, CornerRadius(r, r)))
+            addRect(Rect(-grow - pad, -grow - pad, w + grow + pad, h + grow + pad))
+            addRoundRect(RoundRect(ox, oy, w + ox, h + oy, CornerRadius(r + grow, r + grow)))
         }
         drawPath(ring, color.copy(alpha = a.coerceIn(0f, 1f)))
     }
@@ -288,5 +294,33 @@ fun NeuDialogShell(
                 )
             }
         }
+    }
+}
+
+// ---------------- 主操作按钮：强调色填充 + 白字 + hover 提亮（PC 可点击暗示） ----------------
+
+@Composable
+fun PrimaryButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    val iso = remember { MutableInteractionSource() }
+    val hovered by iso.collectIsHoveredAsState()
+    val neu = LocalNeu.current
+    val bg = when {
+        !enabled -> neu.onSurfaceVariant.copy(alpha = 0.45f)
+        hovered -> neu.primary.copy(alpha = 0.82f)
+        else -> neu.primary
+    }
+    Box(
+        modifier = modifier
+            .clickable(interactionSource = iso, indication = null, enabled = enabled, onClick = onClick)
+            .background(bg, RoundedCornerShape(14.dp))
+            .padding(vertical = 13.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     }
 }
