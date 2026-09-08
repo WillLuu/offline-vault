@@ -1,21 +1,42 @@
 package vault.desktop.app
 
-import vault.desktop.DesktopVault
-
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import vault.desktop.DesktopVault
+import java.awt.MouseInfo
 import kotlin.system.exitProcess
 
 // ============================================================================
-// 桌面应用入口（PC 端 PRD M5 MVP：Material3 标准样式；新拟态重绘为 P2）。
+// 桌面应用入口（无边框自绘窗体 + 新拟态标题栏，全量覆盖新拟态风格）。
 //  - 全程离线：仅消费 vault-desktop 门面，无任何网络依赖（SEC-9）
 //  - 空闲自动锁（F8）+ 剪贴板延时清除（F9）+ 退出/手动锁冲刷；最小化不锁（D3 采纳建议值）
+//  ponytail: 标题栏拖动用 pointerInput + AWT 全局鼠标坐标（CMP 1.6.11 未暴露
+//  WindowDraggableArea）；最小化走 JNA ShowWindow（WindowPlacement.Minimized 未暴露）。
+//  | 升级阈值：CMP 官方 API 就绪后替换。
 // ============================================================================
 
 fun main() {
@@ -25,19 +46,114 @@ fun main() {
     model.start()
 
     application {
-        val dark = isSystemInDarkTheme()
-        MaterialTheme(if (dark) darkColorScheme() else lightColorScheme()) {
-            Window(
-                onCloseRequest = {
-                    DesktopClipboard.flushNow()
-                    model.stop()
-                    exitProcess(0)
-                },
-                title = "秘匣 · 密码保险库（桌面版）",
-                state = rememberWindowState(width = 1120.dp, height = 740.dp),
-            ) {
-                AppRoot(model)
+        val ws = rememberWindowState(width = 1120.dp, height = 740.dp)
+        val onExit = {
+            DesktopClipboard.flushNow()
+            model.stop()
+            exitProcess(0)
+        }
+        Window(
+            onCloseRequest = onExit,
+            title = "秘匣 · 密码保险库",
+            state = ws,
+            undecorated = true,
+            resizable = true,
+        ) {
+            NeuTheme {
+                Column(Modifier.fillMaxSize().background(LocalNeu.current.bg)) {
+                    TitleBar(ws, onExit)
+                    AppRoot(model)
+                }
             }
         }
+    }
+}
+
+/** 新拟态标题栏：品牌徽章 + 标题（拖拽移动区）+ 最大化/最小化/关闭钮。 */
+@Composable
+private fun ApplicationScope.TitleBar(ws: WindowState, onExit: () -> Unit) {
+    val neu = LocalNeu.current
+    val density = LocalDensity.current
+    var grabPx by remember { mutableStateOf<Offset?>(null) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(neu.bg)
+            // 手动拖动：以"窗口左上角 − 抓取点"恒定偏移跟随全局鼠标（避免窗口追指针抖动）
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { grab ->
+                        val m = MouseInfo.getPointerInfo().location
+                        with(density) {
+                            grabPx = Offset(
+                                m.x - ws.position.x.toPx(),
+                                m.y - ws.position.y.toPx()
+                            )
+                        }
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val g = grabPx ?: return@detectDragGestures
+                        val m = MouseInfo.getPointerInfo().location
+                        with(density) {
+                            ws.position = WindowPosition(
+                                (m.x - g.x).toDp(),
+                                (m.y - g.y).toDp()
+                            )
+                        }
+                    }
+                )
+            }
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NeuSurface(dir = NeuDir.Raised, cornerRadius = 12.dp,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)) {
+            Text("17°", color = neu.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(10.dp))
+        Text("秘匣 · 密码保险库", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.weight(1f))
+        // 最大化/还原
+        NeuSurface(dir = NeuDir.Raised, cornerRadius = 15.dp, contentPadding = PaddingValues(0.dp)) {
+            Text(
+                if (ws.placement == WindowPlacement.Maximized) "❐" else "□",
+                color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clickable {
+                        ws.placement = if (ws.placement == WindowPlacement.Maximized)
+                            WindowPlacement.Floating else WindowPlacement.Maximized
+                    },
+                textAlign = TextAlign.Center
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        // 最小化（JNA ShowWindow）
+        NeuSurface(dir = NeuDir.Raised, cornerRadius = 15.dp, contentPadding = PaddingValues(0.dp)) {
+            Text(
+                "─", color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clickable {
+                        java.awt.Window.getWindows().firstOrNull { it.isVisible }
+                            ?.let { minimizeWindow(it) }
+                    },
+                textAlign = TextAlign.Center
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        // 关闭
+        NeuSurface(dir = NeuDir.Raised, cornerRadius = 15.dp, contentPadding = PaddingValues(0.dp)) {
+            Text(
+                "✕", color = neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clickable(onClick = onExit),
+                textAlign = TextAlign.Center
+            )
+        }
+        Spacer(Modifier.width(4.dp))
     }
 }

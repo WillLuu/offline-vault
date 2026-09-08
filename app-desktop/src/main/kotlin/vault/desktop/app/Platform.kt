@@ -7,6 +7,7 @@ import java.awt.datatransfer.StringSelection
 import java.awt.event.KeyEvent
 import java.io.File
 import java.awt.event.MouseEvent
+import com.sun.jna.Pointer
 import kotlin.system.exitProcess
 
 // ============================================================================
@@ -65,3 +66,25 @@ object ActivityMonitor {
 }
 
 fun exitApp() { exitProcess(0) }
+
+// ============================================================================
+// 窗口操作（JNA 直调 user32；避免依赖 CMP 1.6 未暴露的 WindowPlacement.Minimized）
+// ponytail: 仅 Windows；跨平台时按 OS 分支（Linux X11 / macOS 走各自 API）。
+// | 升级阈值：CMP 官方暴露最小化 API 后移除。
+// ============================================================================
+
+private interface User32Ex : com.sun.jna.Library {
+    fun ShowWindow(hWnd: Int, nCmdShow: Int): Boolean
+}
+
+/** 最小化指定 AWT 窗口（SW_MINIMIZE=6）。 */
+fun minimizeWindow(w: java.awt.Window) {
+    try {
+        val user32 = com.sun.jna.Native.load("user32", User32Ex::class.java)
+        val hwnd = com.sun.jna.Native.getComponentPointer(w)
+            ?.let { com.sun.jna.Pointer.nativeValue(it).toInt() } ?: return
+        user32.ShowWindow(hwnd, 6)
+    } catch (_: Throwable) {
+        // 尽力而为：JNA 不可用时静默跳过
+    }
+}

@@ -27,6 +27,9 @@ dependencies {
     implementation(compose.foundation)
     implementation(compose.runtime)
 
+    // 最小化窗口：JNA 直调 user32（见 Platform.kt minimizeWindow）
+    implementation("net.java.dev.jna:jna:5.14.0")
+
     // 桌面 Dispatchers.Main 提供者（经 ServiceLoader 发现；打包后必需，dev 运行同受益）
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
 }

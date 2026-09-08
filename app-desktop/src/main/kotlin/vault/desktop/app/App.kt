@@ -1,63 +1,30 @@
 package vault.desktop.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import vault.desktop.DesktopVault
-import androidx.compose.material.icons.filled.Sort
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Text
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -67,14 +34,13 @@ import vault.ExtraField
 import vault.PasswordEntryRow
 import vault.SettingsPatch
 import vault.SortKey
-import com.qiqiao.passwordvault.util.ChangeMasterError
-import com.qiqiao.passwordvault.util.generatePassword
+import vault.desktop.DesktopVault
+import kotlinx.coroutines.CoroutineScope
 import com.qiqiao.passwordvault.util.formatTime
+import com.qiqiao.passwordvault.util.generatePassword
 import com.qiqiao.passwordvault.util.maskPassword
 import com.qiqiao.passwordvault.util.passwordStrength
 import com.qiqiao.passwordvault.util.strengthLabel
-import com.qiqiao.passwordvault.util.validateChangeMaster
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -85,15 +51,14 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 // ============================================================================
-// 桌面 UI（PC 端 PRD M5 MVP，Material3 标准样式；新拟态重绘为 P2）。
+// 桌面 UI（PC 端 PRD M5，新拟态全量覆盖版：无边框自绘窗体 + NeuSurface 组件）。
 //  屏：解锁/首初始化（F1/F2）→ 主屏（列表+详情双栏，F3/F4）→ 编辑弹窗（F10 生成器）/
 //  设置弹窗（F8/F9 参数 + 改主密码 + 备份导出/导入 F5/F6）。
-//  安全行为：列表掩码、点眼临时显形、复制延时清除+最小化/退出冲刷、空闲自动锁、
-//  改主密码校验复用 core 的 ChangeMaster（同一份逻辑）。
+//  颜色/阴影全部取自 LocalNeu（逐字节移植 Android colors.xml 与 NeuShadowPrefs 定稿档）。
 // ============================================================================
 
 class AppModel(private val vault: DesktopVault) {
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var started = false
 
     var initialized by mutableStateOf(false)
@@ -119,7 +84,7 @@ class AppModel(private val vault: DesktopVault) {
     fun start() {
         if (started) return
         started = true
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             initialized = vault.isInitialized()
             if (initialized) {
                 refreshSettings()
@@ -135,7 +100,7 @@ class AppModel(private val vault: DesktopVault) {
                     DesktopClipboard.flushNow()
                     lockUi()
                 }
-                // 解锁页冷却倒计时（SEC-8）
+                // 解锁页冷却倒计时（SEC-8 UI 反馈）
                 if (!unlocked && lockoutSec > 0) {
                     lockoutSec = (vault.lockoutRemainingMs() / 1000L).toInt().coerceAtLeast(0)
                 }
@@ -146,7 +111,7 @@ class AppModel(private val vault: DesktopVault) {
     fun stop() { scope.cancel() }
 
     fun lockNow() {
-        scope.launch(Dispatchers.IO) { vault.lock() }
+        scope.launch { vault.lock() }
         DesktopClipboard.flushNow()
         lockUi()
     }
@@ -162,7 +127,7 @@ class AppModel(private val vault: DesktopVault) {
     }
 
     fun refreshData() {
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             entries = vault.listEntries(search.takeIf { it.isNotBlank() }, sortBy, categoryFilter)
             categories = vault.listCategories()
         }
@@ -173,9 +138,7 @@ class AppModel(private val vault: DesktopVault) {
         searchJob?.cancel()
         searchJob = scope.launch {
             delay(250) // 防抖，与 Android 同款
-            withContext(Dispatchers.IO) {
-                entries = vault.listEntries(search.takeIf { it.isNotBlank() }, sortBy, categoryFilter)
-            }
+            entries = vault.listEntries(search.takeIf { it.isNotBlank() }, sortBy, categoryFilter)
         }
     }
 
@@ -184,21 +147,19 @@ class AppModel(private val vault: DesktopVault) {
 
     fun select(id: Long) {
         selectedId = id
-        scope.launch(Dispatchers.IO) { selectedDetail = vault.getEntry(id) }
+        scope.launch { selectedDetail = vault.getEntry(id) }
     }
 
     fun unlock(password: String) {
         if (busy || lockoutSec > 0) return
         busy = true; unlockError = null
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val ok = vault.unlockWithPassword(password)
-            withContext(Dispatchers.Main) {
-                busy = false
-                if (ok) { unlocked = true; refreshData() }
-                else {
-                    lockoutSec = (vault.lockoutRemainingMs() / 1000L).toInt()
-                    unlockError = if (lockoutSec > 0) "尝试次数过多，请 ${lockoutSec}s 后重试" else "主密码错误"
-                }
+            busy = false
+            if (ok) { unlocked = true; refreshData() }
+            else {
+                lockoutSec = (vault.lockoutRemainingMs() / 1000L).toInt()
+                unlockError = if (lockoutSec > 0) "尝试次数过多，请 ${lockoutSec}s 后重试" else "主密码错误"
             }
         }
     }
@@ -206,32 +167,29 @@ class AppModel(private val vault: DesktopVault) {
     fun initialize(password: String) {
         if (busy) return
         busy = true
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val ok = vault.initializeMasterPassword(password)
-            withContext(Dispatchers.Main) {
-                busy = false
-                if (ok) { initialized = true; unlocked = true; refreshData() }
-                else unlockError = "初始化失败（可能已初始化过）"
-            }
+            busy = false
+            if (ok) { initialized = true; unlocked = true; refreshData() }
+            else unlockError = "初始化失败（可能已初始化过）"
         }
     }
 
     fun saveEntry(id: Long?, input: EntryInput, onDone: (Boolean) -> Unit) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val ok = try {
                 if (id == null) { vault.createEntry(input) > 0; true } else vault.updateEntry(id, input)
             } catch (e: Exception) { false }
-            withContext(Dispatchers.Main) { if (ok) refreshData(); onDone(ok) }
+            if (ok) refreshData()
+            onDone(ok)
         }
     }
 
     fun deleteEntry(id: Long, onDone: (Boolean) -> Unit) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val ok = vault.deleteEntry(id)
-            withContext(Dispatchers.Main) {
-                if (ok) { selectedId = null; selectedDetail = null; refreshData() }
-                onDone(ok)
-            }
+            if (ok) { selectedId = null; selectedDetail = null; refreshData() }
+            onDone(ok)
         }
     }
 
@@ -246,34 +204,39 @@ class AppModel(private val vault: DesktopVault) {
     }
 
     fun changeMaster(old: String, new: String, confirm: String, onResult: (String?) -> Unit) {
-        val err = when (validateChangeMaster(old, new, confirm)) {
-            ChangeMasterError.OLD_BLANK, ChangeMasterError.NEW_BLANK -> "密码不能为空"
-            ChangeMasterError.NEW_TOO_SHORT -> "新主密码至少 8 位"
-            ChangeMasterError.MISMATCH -> "两次输入的新密码不一致"
-            null -> null
+        val err = when (com.qiqiao.passwordvault.util.validateChangeMaster(old, new, confirm)) {
+            com.qiqiao.passwordvault.util.ChangeMasterError.OLD_BLANK,
+            com.qiqiao.passwordvault.util.ChangeMasterError.NEW_BLANK -> "密码不能为空"
+            com.qiqiao.passwordvault.util.ChangeMasterError.NEW_TOO_SHORT -> "新主密码至少 8 位"
+            com.qiqiao.passwordvault.util.ChangeMasterError.MISMATCH -> "两次输入的新密码不一致"
+            else -> null
         }
         if (err != null) { onResult(err); return }
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val ok = vault.changeMasterPassword(old, new)
-            withContext(Dispatchers.Main) { onResult(if (ok) null else "旧主密码错误") }
+            onResult(if (ok) null else "旧主密码错误")
         }
     }
 
     fun exportBackup(path: String, filePw: String, same: Boolean, onResult: (String) -> Unit) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val msg = try {
                 val bytes = vault.exportVault(filePw, same)
                 File(path).writeBytes(bytes)
                 "已导出 ${bytes.size} 字节 → $path"
-            } catch (e: vault.LockedException) { "会话已锁定" }
-            catch (e: vault.WrongPasswordException) { "主密码错误" }
-            catch (e: Exception) { "导出失败：${e.message}" }
-            withContext(Dispatchers.Main) { onResult(msg) }
+            } catch (e: Exception) {
+                when (e) {
+                    is vault.LockedException -> "会话已锁定"
+                    is vault.WrongPasswordException -> "主密码错误"
+                    else -> "导出失败：${e.message}"
+                }
+            }
+            onResult(msg)
         }
     }
 
     fun importBackup(path: String, filePw: String, onResult: (String) -> Unit) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val msg = try {
                 val r = vault.importVault(File(path).readBytes(), filePw)
                 refreshData()
@@ -282,16 +245,15 @@ class AppModel(private val vault: DesktopVault) {
                     "（合并≠同步，删除不会传播）"
             } catch (e: vault.WrongPasswordException) { "导入失败：文件密码错误" }
             catch (e: Exception) { "导入失败：${e.message}" }
-            withContext(Dispatchers.Main) { onResult(msg) }
+            onResult(msg)
         }
     }
 
     fun saveSettings(lock: Int, clip: Int, onResult: (String) -> Unit) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch {
             val ok = vault.updateSettings(SettingsPatch(autoLockTimeoutSec = lock, clipboardClearDelaySec = clip))
-            withContext(Dispatchers.Main) {
-                if (ok) { autoLockSec = lock; clipboardSec = clip; onResult("已保存") } else onResult("保存失败")
-            }
+            if (ok) { autoLockSec = lock; clipboardSec = clip }
+            onResult(if (ok) "已保存" else "保存失败")
         }
     }
 }
@@ -306,13 +268,30 @@ private val SortOptions = listOf(
 
 @Composable
 fun AppRoot(model: AppModel) {
-    val snackbarHost = remember { SnackbarHostState() }
-    LaunchedEffect(model.snackbar) {
-        model.snackbar?.let { snackbarHost.showSnackbar(it, withDismissAction = false) }
-    }
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    val neu = LocalNeu.current
+    Column(Modifier.fillMaxSize().background(neu.bg)) {
         if (!model.unlocked) UnlockScreen(model) else MainScreen(model)
-        SnackbarHost(hostState = snackbarHost, modifier = Modifier.padding(12.dp))
+    }
+    // 全局提示条（新拟态凸起气泡）
+    model.snackbar?.let { msg ->
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            NeuSurface(dir = NeuDir.Raised, cornerRadius = 14.dp,
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)) {
+                Text(msg, color = neu.onSurface, fontSize = 13.sp)
+            }
+        }
+        LaunchedEffect(msg) { delay(3000); if (model.snackbar == msg) model.snackbar = null }
+    }
+}
+
+// ---------------- 品牌徽章 ----------------
+
+@Composable
+private fun BrandBadge() {
+    val neu = LocalNeu.current
+    NeuSurface(dir = NeuDir.Raised, cornerRadius = 40.dp,
+        contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp)) {
+        Text("17°", color = neu.primary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -323,6 +302,7 @@ fun UnlockScreen(model: AppModel) = if (!model.initialized) InitScreen(model) el
 
 @Composable
 private fun InitScreen(model: AppModel) {
+    val neu = LocalNeu.current
     var p1 by remember { mutableStateOf("") }
     var p2 by remember { mutableStateOf("") }
     Column(
@@ -330,128 +310,128 @@ private fun InitScreen(model: AppModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("秘匣 · 密码保险库", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
+        BrandBadge()
+        Spacer(Modifier.height(18.dp))
+        Text("秘匣 · 密码保险库", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(6.dp))
         Text("首次使用：设置主密码（≥8 位，纯离线无法找回，请牢记）",
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(24.dp))
-        OutlinedTextField(p1, { p1 = it }, label = { Text("主密码") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.width(360.dp))
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(p2, { p2 = it }, label = { Text("确认主密码") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.width(360.dp))
+            fontSize = 12.sp, color = neu.onSurfaceVariant)
+        Spacer(Modifier.height(28.dp))
+        NeuField(p1, { p1 = it }, hint = "主密码", isPassword = true, modifier = Modifier.width(360.dp))
+        Spacer(Modifier.height(14.dp))
+        NeuField(p2, { p2 = it }, hint = "确认主密码", isPassword = true, modifier = Modifier.width(360.dp))
         if (model.unlockError != null) {
-            Text(model.unlockError!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(model.unlockError!!, color = neu.error, fontSize = 12.sp)
         }
-        Spacer(Modifier.height(20.dp))
-        Button(
-            onClick = {
-                when {
-                    p1.length < 8 -> model.unlockError = "主密码至少 8 位"
-                    p1 != p2 -> model.unlockError = "两次输入不一致"
-                    else -> model.initialize(p1)
-                }
-            },
-            enabled = !model.busy
-        ) { Text(if (model.busy) "正在初始化…" else "创建密码库") }
+        Spacer(Modifier.height(24.dp))
+        NeuButton(
+            text = if (model.busy) "正在初始化…" else "创建密码库",
+            enabled = !model.busy && p1.length >= 8 && p1 == p2
+        ) {
+            when {
+                p1.length < 8 -> model.unlockError = "主密码至少 8 位"
+                p1 != p2 -> model.unlockError = "两次输入不一致"
+                else -> model.initialize(p1)
+            }
+        }
     }
 }
 
 @Composable
 private fun UnlockPanel(model: AppModel) {
+    val neu = LocalNeu.current
     var pw by remember { mutableStateOf("") }
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("秘匣 · 密码保险库", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text("输入主密码解锁", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(24.dp))
-        OutlinedTextField(pw, { pw = it }, label = { Text("主密码") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.width(360.dp))
+        BrandBadge()
+        Spacer(Modifier.height(18.dp))
+        Text("秘匣 · 密码保险库", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Text("NEUMORPHISM VAULT", fontSize = 11.sp, letterSpacing = 3.sp, color = neu.onSurfaceVariant)
+        Spacer(Modifier.height(28.dp))
+        NeuField(pw, { pw = it }, hint = "主密码", isPassword = true, modifier = Modifier.width(360.dp))
         if (model.unlockError != null) {
-            Text(model.unlockError!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(model.unlockError!!, color = neu.error, fontSize = 12.sp)
         }
-        Spacer(Modifier.height(20.dp))
-        Button(onClick = { model.unlock(pw); pw = "" }, enabled = !model.busy && model.lockoutSec <= 0) {
-            Text(when {
+        if (model.lockoutSec > 0) {
+            Spacer(Modifier.height(6.dp))
+            Text("冷却中 ${model.lockoutSec}s", color = neu.onSurfaceVariant, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(24.dp))
+        NeuButton(
+            text = when {
                 model.busy -> "解锁中…"
                 model.lockoutSec > 0 -> "冷却中 ${model.lockoutSec}s"
-                else -> "解锁"
-            })
+                else -> "解 锁"
+            },
+            enabled = !model.busy && model.lockoutSec <= 0,
+            contentPadding = PaddingValues(horizontal = 96.dp, vertical = 14.dp)
+        ) { model.unlock(pw); pw = "" }
+        Spacer(Modifier.height(40.dp))
+        // 底部指纹位（视觉呼应 Android 版）
+        NeuSurface(dir = NeuDir.Raised, cornerRadius = 34.dp,
+            contentPadding = PaddingValues(14.dp), modifier = Modifier.alpha(0.7f)) {
+            Text("🔒", fontSize = 18.sp)
         }
     }
 }
 
 // ---------------- 主屏（F3/F4，列表 + 详情双栏） ----------------
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(model: AppModel) {
+    val neu = LocalNeu.current
     var showSettings by remember { mutableStateOf(false) }
     var showEdit by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<PasswordEntryRow?>(null) }
     var showDelete by remember { mutableStateOf(false) }
-    val snackbarHost = remember { SnackbarHostState() }
 
-    LaunchedEffect(model.snackbar) {
-        model.snackbar?.let { snackbarHost.showSnackbar(it, withDismissAction = false) }
-    }
-
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHost) },
-        topBar = {
-            Surface(shadowElevation = 4.dp) {
-                TopAppBar(
-                    title = { Text("秘匣", fontWeight = FontWeight.Bold) },
-                    actions = {
-                        IconButton(onClick = { model.lockNow() }) {
-                            Icon(Icons.Filled.Lock, contentDescription = "立即锁定")
-                        }
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(Icons.Filled.Settings, contentDescription = "设置")
-                        }
-                    }
-                )
-            }
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { editTarget = null; showEdit = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "新增条目")
+    Column(Modifier.fillMaxSize()) {
+        // 顶栏：凸起条（搜索 + 排序 + 分类 + 计数 + 设置 + 锁定）
+        NeuSurface(dir = NeuDir.Raised, cornerRadius = 0.dp,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("秘匣", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+                Spacer(Modifier.width(16.dp))
+                NeuField(model.search, { model.onSearchChange(it) }, hint = "搜索名称或用户名",
+                    modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(10.dp))
+                SortMenu(model.sortBy) { model.setSort(it) }
+                CategoryMenu(model) { model.filterByCategory(it) }
+                Spacer(Modifier.width(6.dp))
+                Text("共 ${model.entries.size} 条", fontSize = 12.sp, color = neu.onSurfaceVariant)
+                Spacer(Modifier.width(8.dp))
+                NeuIconButton(onClick = { showSettings = true }, sizeDp = 38.dp) {
+                    Text("⚙", fontSize = 16.sp, color = neu.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(6.dp))
+                NeuIconButton(onClick = { model.lockNow() }, sizeDp = 38.dp) {
+                    Text("🔒", fontSize = 14.sp)
+                }
             }
         }
-    ) { pad ->
-        Row(modifier = Modifier.padding(pad).fillMaxSize()) {
-            // 左：搜索 + 过滤 + 列表
-            Column(modifier = Modifier.width(400.dp).fillMaxHeight().padding(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(model.search, { model.onSearchChange(it) },
-                        placeholder = { Text("搜索名称或用户名") }, singleLine = true,
-                        modifier = Modifier.weight(1f).height(52.dp),
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) })
-                    SortMenu(model.sortBy) { model.setSort(it) }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
-                    CategoryMenu(model) { model.filterByCategory(it) }
-                    Spacer(Modifier.weight(1f))
-                    Text("共 ${model.entries.size} 条",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-                }
+        Spacer(Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxSize()) {
+            // 左：列表
+            Column(modifier = Modifier.width(400.dp).fillMaxHeight().padding(horizontal = 8.dp)) {
                 if (model.entries.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             if (model.search.isBlank()) "还没有条目，点右下角 + 新增" else "无匹配结果",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = neu.onSurfaceVariant, fontSize = 13.sp
                         )
                     }
                 } else {
                     LazyColumn {
                         items(model.entries, key = { it.id }) { e ->
                             EntryCard(
-                                name = e.name, username = e.username.orEmpty(),
+                                name = e.name, username = e.username,
                                 category = e.categoryName ?: "未分类",
                                 selected = e.id == model.selectedId,
                                 onClick = { model.select(e.id) }
@@ -460,8 +440,8 @@ fun MainScreen(model: AppModel) {
                     }
                 }
             }
-            // 分隔线
-            Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+            // 分隔线（凹槽）
+            Box(Modifier.width(3.dp).fillMaxHeight().background(neu.insetBg))
             // 右：详情
             DetailPane(
                 model = model,
@@ -471,51 +451,61 @@ fun MainScreen(model: AppModel) {
         }
     }
 
+    // 悬浮新增钮（右下）
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+        NeuSurface(
+            dir = NeuDir.Raised, cornerRadius = 28.dp,
+            modifier = Modifier.padding(end = 24.dp, bottom = 24.dp)
+        ) {
+            Text(
+                "+", fontSize = 26.sp, color = neu.primary, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clickable { editTarget = null; showEdit = true }
+                    .padding(horizontal = 18.dp, vertical = 4.dp)
+            )
+        }
+    }
+
     if (showEdit) EditDialog(model, editTarget) { showEdit = false }
     if (showSettings) SettingsDialog(model) { showSettings = false }
     if (showDelete) {
         val name = model.selectedDetail?.name ?: ""
-        AlertDialog(
-            onDismissRequest = { showDelete = false },
-            title = { Text("删除条目") },
-            text = { Text("删除「$name」？（软删除，可由含该条目的备份重新导入恢复）") },
-            confirmButton = {
-                TextButton(onClick = {
+        NeuDialogShell(width = 420.dp) {
+            Text("删除条目", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+            Spacer(Modifier.height(12.dp))
+            Text("删除「$name」？（软删除，可由含该条目的备份重新导入恢复）",
+                color = neu.onSurface, fontSize = 14.sp)
+            Spacer(Modifier.height(20.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                NeuTextButton("取消") { showDelete = false }
+                Spacer(Modifier.width(8.dp))
+                NeuButton("删除", danger = true) {
                     model.selectedDetail?.let { e -> model.deleteEntry(e.id) { showDelete = false } }
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton({ showDelete = false }) { Text("取消") } }
-        )
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun EntryCard(name: String, username: String, category: String, selected: Boolean, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+    val neu = LocalNeu.current
+    NeuSurface(
+        dir = NeuDir.Raised, cornerRadius = 18.dp,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable(onClick = onClick),
+        contentPadding = PaddingValues(14.dp)
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(40.dp).background(
-                    MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp)
-                ), contentAlignment = Alignment.Center
-            ) {
-                Text(monogram(name), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NeuSurface(dir = NeuDir.Raised, cornerRadius = 12.dp,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(monogram(name), color = neu.primary, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(name, fontWeight = FontWeight.SemiBold)
-                Text(username.ifBlank { "—" },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(name, fontWeight = FontWeight.SemiBold, color = neu.onSurface, fontSize = 15.sp)
+                Text(username.ifBlank { "—" }, fontSize = 12.sp, color = neu.onSurfaceVariant)
             }
-            Text(category, style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(category, fontSize = 11.sp, color = neu.onSurfaceVariant)
         }
     }
 }
@@ -529,10 +519,11 @@ private fun monogram(name: String): String {
 
 @Composable
 private fun RowScope.DetailPane(model: AppModel, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val neu = LocalNeu.current
     val e = model.selectedDetail
     if (e == null) {
         Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            Text("选择左侧条目查看详情", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("选择左侧条目查看详情", color = neu.onSurfaceVariant, fontSize = 13.sp)
         }
         return
     }
@@ -540,17 +531,15 @@ private fun RowScope.DetailPane(model: AppModel, onEdit: () -> Unit, onDelete: (
         modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(20.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(e.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+            Text(e.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
                 modifier = Modifier.weight(1f))
-            IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "编辑") }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
-            }
+            NeuTextButton("编辑") { onEdit() }
+            NeuTextButton("删除") { onDelete() }
         }
         Spacer(Modifier.height(4.dp))
         Text(
             "${e.categoryName ?: "未分类"} · 更新于 ${formatTime(e.updatedAt)} · 强度 ${strengthLabel(passwordStrength(e.password.orEmpty()))}",
-            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = 11.sp, color = neu.onSurfaceVariant
         )
         Spacer(Modifier.height(16.dp))
 
@@ -560,20 +549,24 @@ private fun RowScope.DetailPane(model: AppModel, onEdit: () -> Unit, onDelete: (
         FieldRow("备注", e.notes.orEmpty(), model)
         e.extras.forEach { f -> FieldRow(f.label, f.value, model) }
         Spacer(Modifier.height(8.dp))
-        Text("创建于 ${formatTime(e.createdAt)}", style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("创建于 ${formatTime(e.createdAt)}", fontSize = 11.sp, color = neu.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun FieldRow(label: String, value: String, model: AppModel) {
+    val neu = LocalNeu.current
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 11.sp, color = neu.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(value.ifBlank { "—" }, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
-            IconButton(onClick = { model.copySecret(value, label) }, enabled = value.isNotBlank()) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = "复制$label")
+            Text(
+                value.ifBlank { "—" },
+                modifier = Modifier.weight(1f),
+                fontFamily = FontFamily.Monospace,
+                color = neu.textIn
+            )
+            NeuIconButton(onClick = { model.copySecret(value, label) }, sizeDp = 34.dp) {
+                Text("⧉", color = neu.accent, fontSize = 14.sp)
             }
         }
     }
@@ -581,25 +574,22 @@ private fun FieldRow(label: String, value: String, model: AppModel) {
 
 @Composable
 private fun PasswordRow(password: String, model: AppModel) {
+    val neu = LocalNeu.current
     var revealed by remember(password) { mutableStateOf(false) }
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text("密码", style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("密码", fontSize = 11.sp, color = neu.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 if (revealed) password else maskPassword(),
                 modifier = Modifier.weight(1f),
                 fontFamily = FontFamily.Monospace,
-                color = if (revealed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color = if (revealed) neu.primary else neu.textIn
             )
-            IconButton(onClick = { revealed = !revealed }) {
-                Icon(
-                    if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                    contentDescription = if (revealed) "隐藏密码" else "显示密码"
-                )
+            NeuIconButton(onClick = { revealed = !revealed }, sizeDp = 34.dp) {
+                Text(if (revealed) "🙈" else "👁", fontSize = 13.sp)
             }
-            IconButton(onClick = { model.copySecret(password, "密码") }) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = "复制密码")
+            NeuIconButton(onClick = { model.copySecret(password, "密码") }, sizeDp = 34.dp) {
+                Text("⧉", color = neu.accent, fontSize = 14.sp)
             }
         }
     }
@@ -610,12 +600,16 @@ private fun PasswordRow(password: String, model: AppModel) {
 @Composable
 private fun SortMenu(current: SortKey, onSelect: (SortKey) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val neu = LocalNeu.current
     Box {
-        TextButton(onClick = { open = true }) {
-            Icon(Icons.Filled.Sort, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(SortOptions.first { it.first == current }.second)
-        }
+        Text(
+            "▾ ${SortOptions.first { it.first == current }.second}",
+            fontSize = 13.sp, color = neu.onSurface, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { open = !open }
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        )
         DropdownMenu(open, { open = false }) {
             SortOptions.forEach { (k, label) ->
                 DropdownMenuItem(text = { Text(label) }, onClick = { onSelect(k); open = false })
@@ -627,10 +621,17 @@ private fun SortMenu(current: SortKey, onSelect: (SortKey) -> Unit) {
 @Composable
 private fun CategoryMenu(model: AppModel, onSelect: (Long?) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val neu = LocalNeu.current
     val label = if (model.categoryFilter == null) "全部分类"
     else model.categories.firstOrNull { it.id == model.categoryFilter }?.name ?: "全部分类"
     Box {
-        TextButton(onClick = { open = true }) { Text(label) }
+        Text(
+            "▾ $label", fontSize = 13.sp, color = neu.onSurface, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { open = !open }
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        )
         DropdownMenu(open, { open = false }) {
             DropdownMenuItem(text = { Text("全部分类") },
                 onClick = { onSelect(null); open = false })
@@ -646,6 +647,7 @@ private fun CategoryMenu(model: AppModel, onSelect: (Long?) -> Unit) {
 
 @Composable
 fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Unit) {
+    val neu = LocalNeu.current
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var username by remember { mutableStateOf(initial?.username ?: "") }
     var password by remember { mutableStateOf(initial?.password ?: "") }
@@ -655,77 +657,59 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
     var catId by remember { mutableStateOf(initial?.categoryId) }
     var showCat by remember { mutableStateOf(false) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.width(520.dp)) {
-            Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-                Text(if (initial == null) "新增条目" else "编辑条目",
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(name, { name = it }, label = { Text("平台 *") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(username, { username = it }, label = { Text("账号") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(password, { password = it }, label = { Text("密码") }, singleLine = true,
-                        visualTransformation = if (revealed) VisualTransformation.None
-                        else PasswordVisualTransformation(),
-                        modifier = Modifier.weight(1f))
-                    IconButton(onClick = { revealed = !revealed }) {
-                        Icon(
-                            if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (revealed) "隐藏密码" else "显示密码"
-                        )
-                    }
-                    TextButton(onClick = {
-                        password = generatePassword(20, com.qiqiao.passwordvault.util.CharsetFlags())
-                    }) { Text("生成") }
+    NeuDialogShell(width = 540.dp) {
+        Text(if (initial == null) "新增条目" else "编辑条目",
+            fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(16.dp))
+        NeuField(name, { name = it }, hint = "平台 *", modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(12.dp))
+        NeuField(username, { username = it }, hint = "账号", modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NeuField(password, { password = it }, hint = "密码", isPassword = true,
+                modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            NeuIconButton(onClick = { revealed = !revealed }, sizeDp = 40.dp) {
+                Text(if (revealed) "🙈" else "👁", fontSize = 13.sp)
+            }
+            Spacer(Modifier.width(6.dp))
+            NeuButton("生成") { password = generatePassword(20, com.qiqiao.passwordvault.util.CharsetFlags()) }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text("强度：${strengthLabel(passwordStrength(password))}",
+            fontSize = 11.sp, color = neu.onSurfaceVariant)
+        Spacer(Modifier.height(12.dp))
+        NeuField(website, { website = it }, hint = "网站", modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(12.dp))
+        NeuField(notes, { notes = it }, hint = "备注", singleLine = false, minLines = 3,
+            modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        Box {
+            NeuTextButton(
+                "分类：${model.categories.firstOrNull { it.id == catId }?.name ?: "未分类"} ▾"
+            ) { showCat = true }
+            DropdownMenu(showCat, { showCat = false }) {
+                DropdownMenuItem(text = { Text("未分类") }, onClick = { catId = null; showCat = false })
+                model.categories.forEach { c ->
+                    DropdownMenuItem(text = { Text(c.name) }, onClick = { catId = c.id; showCat = false })
                 }
-                Text("强度：${strengthLabel(passwordStrength(password))}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(website, { website = it }, label = { Text("网站") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(notes, { notes = it }, label = { Text("备注") },
-                    modifier = Modifier.fillMaxWidth().height(90.dp))
-                Spacer(Modifier.height(10.dp))
-                Box {
-                    TextButton(onClick = { showCat = true }) {
-                        Text("分类：${model.categories.firstOrNull { it.id == catId }?.name ?: "未分类"}")
-                    }
-                    DropdownMenu(showCat, { showCat = false }) {
-                        DropdownMenuItem(text = { Text("未分类") },
-                            onClick = { catId = null; showCat = false })
-                        model.categories.forEach { c ->
-                            DropdownMenuItem(text = { Text(c.name) },
-                                onClick = { catId = c.id; showCat = false })
-                        }
-                    }
-                }
-                if (initial != null && initial.extras.isNotEmpty()) {
-                    Text("自定义词条 ${initial.extras.size} 条将保留（词条编辑 P2）",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("取消") }
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            // 编辑时保留已有自定义词条（P2 才开放词条编辑），防保存误清
-                            val input = EntryInput(
-                                name.trim(), username.trim(), password, website.trim(), notes,
-                                catId, initial?.extras ?: emptyList()
-                            )
-                            model.saveEntry(initial?.id, input) { ok -> if (ok) onDismiss() }
-                        },
-                        enabled = name.isNotBlank()
-                    ) { Text("保存") }
-                }
+            }
+        }
+        if (initial != null && initial.extras.isNotEmpty()) {
+            Text("自定义词条 ${initial.extras.size} 条将保留（词条编辑 P2）",
+                fontSize = 11.sp, color = neu.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(20.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("取消") { onDismiss() }
+            Spacer(Modifier.width(10.dp))
+            NeuButton("保存", enabled = name.isNotBlank()) {
+                // 编辑时保留已有自定义词条（P2 才开放词条编辑），防保存误清
+                val input = EntryInput(
+                    name.trim(), username.trim(), password, website.trim(), notes,
+                    catId, initial?.extras ?: emptyList()
+                )
+                model.saveEntry(initial?.id, input) { ok -> if (ok) onDismiss() }
             }
         }
     }
@@ -735,6 +719,7 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
 
 @Composable
 fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
+    val neu = LocalNeu.current
     var lockSec by remember { mutableStateOf(model.autoLockSec.toString()) }
     var clipSec by remember { mutableStateOf(model.clipboardSec.toString()) }
     var msg by remember { mutableStateOf<String?>(null) }
@@ -743,54 +728,49 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     var showExport by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
 
+    NeuDialogShell(width = 540.dp) {
+        Column {
+            Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+            Spacer(Modifier.height(16.dp))
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.width(520.dp)) {
-            Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-                Text("设置", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(16.dp))
+            NeuField(lockSec, { lockSec = it }, hint = "自动锁超时（秒，0=不超时）",
+                modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(10.dp))
+            NeuField(clipSec, { clipSec = it }, hint = "剪贴板清除延时（秒，0=永不）",
+                modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(10.dp))
+            NeuButton("保存安全设置") {
+                val l = lockSec.toIntOrNull(); val c = clipSec.toIntOrNull()
+                if (l == null || c == null || l < 0 || c < 0) msg = "请输入非负整数"
+                else model.saveSettings(l, c) { msg = it }
+            }
 
-                OutlinedTextField(lockSec, { lockSec = it }, label = { Text("自动锁超时（秒，0=不超时）") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(clipSec, { clipSec = it },
-                    label = { Text("剪贴板清除延时（秒，0=永不）") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = {
-                    val l = lockSec.toIntOrNull(); val c = clipSec.toIntOrNull()
-                    if (l == null || c == null || l < 0 || c < 0) msg = "请输入非负整数"
-                    else model.saveSettings(l, c) { msg = it }
-                }) { Text("保存安全设置") }
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.insetBg))
+            Spacer(Modifier.height(14.dp))
+            Text("修改主密码", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+            Spacer(Modifier.height(8.dp))
+            NeuButton("修改主密码…") { msg = null; showChangePw = true }
 
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(16.dp))
-                Text("修改主密码", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { msg = null; showChangePw = true }) { Text("修改主密码…") }
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.insetBg))
+            Spacer(Modifier.height(14.dp))
+            Text("备份（与 Android 版 .vault 双向兼容）", fontSize = 15.sp,
+                fontWeight = FontWeight.Bold, color = neu.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Row {
+                NeuButton("导出 .vault…") { msg = null; showExport = true }
+                Spacer(Modifier.width(12.dp))
+                NeuButton("导入 .vault…") { msg = null; showImport = true }
+            }
 
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(16.dp))
-                Text("备份（与 Android 版 .vault 双向兼容）", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                Row {
-                    Button(onClick = { msg = null; showExport = true }) { Text("导出 .vault…") }
-                    Spacer(Modifier.width(12.dp))
-                    Button(onClick = { msg = null; showImport = true }) { Text("导入 .vault…") }
-                }
-
-                msg?.let {
-                    Spacer(Modifier.height(12.dp))
-                    Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("关闭") }
-                }
+            msg?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, fontSize = 13.sp, color = neu.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                NeuTextButton("关闭") { onDismiss() }
             }
         }
     }
@@ -802,29 +782,24 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
 
 @Composable
 private fun ChangePwDialog(model: AppModel, onDone: (String?) -> Unit) {
+    val neu = LocalNeu.current
     var old by remember { mutableStateOf("") }
     var n1 by remember { mutableStateOf("") }
     var n2 by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = { onDone(null) }) {
-        Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.width(460.dp)) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text("修改主密码", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(old, { old = it }, label = { Text("旧主密码") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(n1, { n1 = it }, label = { Text("新主密码（≥8 位）") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(n2, { n2 = it }, label = { Text("确认新主密码") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton({ onDone(null) }) { Text("取消") }
-                    Spacer(Modifier.width(8.dp))
-                    Button(onClick = { model.changeMaster(old, n1, n2) { onDone(it) } },
-                        enabled = old.isNotBlank() && n1.isNotBlank() && n2.isNotBlank()) { Text("修改") }
-                }
+    NeuDialogShell(width = 460.dp) {
+        Text("修改主密码", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(14.dp))
+        NeuField(old, { old = it }, hint = "旧主密码", isPassword = true, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        NeuField(n1, { n1 = it }, hint = "新主密码（≥8 位）", isPassword = true, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        NeuField(n2, { n2 = it }, hint = "确认新主密码", isPassword = true, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(20.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("取消") { onDone(null) }
+            Spacer(Modifier.width(10.dp))
+            NeuButton("修改", enabled = old.isNotBlank() && n1.isNotBlank() && n2.isNotBlank()) {
+                model.changeMaster(old, n1, n2) { onDone(it) }
             }
         }
     }
@@ -832,51 +807,44 @@ private fun ChangePwDialog(model: AppModel, onDone: (String?) -> Unit) {
 
 @Composable
 private fun ExportDialog(model: AppModel, onDone: (String?) -> Unit) {
+    val neu = LocalNeu.current
     var same by remember { mutableStateOf(true) }
     var master by remember { mutableStateOf("") }
     var exportPw by remember { mutableStateOf("") }
 
-    Dialog(onDismissRequest = { onDone(null) }) {
-        Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.width(480.dp)) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text("导出加密备份（.vault）", style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(same, { same = true })
-                    Text("主密码同源", modifier = Modifier.clickable { same = true }.padding(end = 16.dp))
-                    RadioButton(!same, { same = false })
-                    Text("独立导出密码", modifier = Modifier.clickable { same = false })
-                }
-                if (same) {
-                    // 同源路径需重输主密码（会话仅持 DEK，不存主密码——与 Android 导出一致）
-                    OutlinedTextField(master, { master = it }, label = { Text("本库主密码") }, singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                } else {
-                    OutlinedTextField(exportPw, { exportPw = it },
-                        label = { Text("独立导出密码（≥8 位）") }, singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (same) "导入端需输入本库主密码" else "导入端需输入此独立导出密码",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton({ onDone(null) }) { Text("取消") }
-                    Spacer(Modifier.width(8.dp))
-                    Button(onClick = {
-                        val filePw = if (same) master else exportPw
-                        if (!same && exportPw.length < 8) { onDone("独立导出密码至少 8 位"); return@Button }
-                        if (filePw.isBlank()) { onDone("请输入密码"); return@Button }
-                        val target = awtSaveDialog(null, "保存加密备份", "offline-vault.vault")
-                        if (target == null) { onDone(null); return@Button }
-                        model.exportBackup(target.absolutePath, filePw, same) { onDone(it) }
-                    }) { Text("选择位置并导出") }
-                }
+    NeuDialogShell(width = 480.dp) {
+        Text("导出加密备份（.vault）", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NeuTextButton(if (same) "● 主密码同源" else "○ 主密码同源") { same = true }
+            NeuTextButton(if (!same) "● 独立导出密码" else "○ 独立导出密码") { same = false }
+        }
+        if (same) {
+            // 同源路径需重输主密码（会话仅持 DEK，不存主密码——与 Android 导出一致）
+            Spacer(Modifier.height(10.dp))
+            NeuField(master, { master = it }, hint = "本库主密码", isPassword = true,
+                modifier = Modifier.fillMaxWidth())
+        } else {
+            Spacer(Modifier.height(10.dp))
+            NeuField(exportPw, { exportPw = it }, hint = "独立导出密码（≥8 位）",
+                modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (same) "导入端需输入本库主密码" else "导入端需输入此独立导出密码",
+            fontSize = 11.sp, color = neu.onSurfaceVariant
+        )
+        Spacer(Modifier.height(18.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("取消") { onDone(null) }
+            Spacer(Modifier.width(10.dp))
+            NeuButton("选择位置并导出") {
+                val filePw = if (same) master else exportPw
+                if (filePw.isBlank()) { onDone("请输入密码"); return@NeuButton }
+                if (!same && exportPw.length < 8) { onDone("独立导出密码至少 8 位"); return@NeuButton }
+                val target = awtSaveDialog(null, "保存加密备份", "offline-vault.vault")
+                if (target == null) { onDone(null); return@NeuButton }
+                model.exportBackup(target.absolutePath, filePw, same) { onDone(it) }
             }
         }
     }
@@ -884,30 +852,24 @@ private fun ExportDialog(model: AppModel, onDone: (String?) -> Unit) {
 
 @Composable
 private fun ImportDialog(model: AppModel, onDone: (String?) -> Unit) {
+    val neu = LocalNeu.current
     var filePw by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = { onDone(null) }) {
-        Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.width(480.dp)) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text("导入加密备份（.vault）", style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                Text("按（名称+账号+分类）合并、更新时间取新。删除不会传播，导入≠同步。",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(filePw, { filePw = it }, label = { Text("该备份文件的密码") },
-                    singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton({ onDone(null) }) { Text("取消") }
-                    Spacer(Modifier.width(8.dp))
-                    Button(onClick = {
-                        val src = awtOpenDialog(null, "选择 .vault 备份文件")
-                        if (src == null) { onDone(null); return@Button }
-                        model.importBackup(src.absolutePath, filePw) { onDone(it) }
-                    }) { Text("选择文件并导入") }
-                }
+    NeuDialogShell(width = 480.dp) {
+        Text("导入加密备份（.vault）", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(14.dp))
+        Text("按（名称+账号+分类）合并、更新时间取新。删除不会传播，导入≠同步。",
+            fontSize = 12.sp, color = neu.onSurfaceVariant)
+        Spacer(Modifier.height(12.dp))
+        NeuField(filePw, { filePw = it }, hint = "该备份文件的密码", isPassword = true,
+            modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(18.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("取消") { onDone(null) }
+            Spacer(Modifier.width(10.dp))
+            NeuButton("选择文件并导入") {
+                val src = awtOpenDialog(null, "选择 .vault 备份文件")
+                if (src == null) { onDone(null); return@NeuButton }
+                model.importBackup(src.absolutePath, filePw) { onDone(it) }
             }
         }
     }
