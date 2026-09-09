@@ -28,7 +28,10 @@ data class NeuColors(
     val divider: Color,         // 分隔细线
     val hoverBg: Color,         // 悬停浅灰
     val error: Color,
-    val accent: Color           // 复制钮等点缀绿
+    val accent: Color,          // 复制钮等点缀绿
+    val insetBg: Color,         // 凹陷底（比面板暗一档）
+    val bevelDark: Color,       // 凹陷浮雕暗端（左上）
+    val bevelLight: Color       // 凹陷浮雕亮端（右下）
 )
 
 val LightNeu = NeuColors(
@@ -43,7 +46,10 @@ val LightNeu = NeuColors(
     divider = Color.White.copy(alpha = 0.6f),
     hoverBg = Color(0xFFE9EBF2),
     error = Color(0xFFEF4444),
-    accent = Color(0xFF3FB598)
+    accent = Color(0xFF3FB598),
+    insetBg = Color(0xFFE9ECF3),
+    bevelDark = Color(0xFFB4BDCE),
+    bevelLight = Color(0xFFFFFFFF)
 )
 
 val DarkNeu = NeuColors(
@@ -58,7 +64,10 @@ val DarkNeu = NeuColors(
     divider = Color.White.copy(alpha = 0.08f),
     hoverBg = Color(0xFF333844),
     error = Color(0xFFEF4444),
-    accent = Color(0xFF4ECFAE)
+    accent = Color(0xFF4ECFAE),
+    insetBg = Color(0xFF191C24),
+    bevelDark = Color(0xFF0D0F14),
+    bevelLight = Color(0xFF3C4351)
 )
 
 val LocalNeu = staticCompositionLocalOf { LightNeu }

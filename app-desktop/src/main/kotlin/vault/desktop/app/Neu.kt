@@ -36,6 +36,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -102,8 +108,26 @@ fun NeuField(
 
     Box(
         modifier = modifier
-            .shadow(1.dp, RoundedCornerShape(10.dp))
-            .background(neu.surface, RoundedCornerShape(10.dp))
+            .background(neu.insetBg, RoundedCornerShape(10.dp))
+            .drawBehind {
+                // 凹陷浮雕：沿圆角描边画 1px 斜向渐变线（左上暗、右下亮）——
+                // 纯描边零模糊，视觉即"压进面板"
+                val r = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                drawRoundRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            neu.bevelDark.copy(alpha = 0.6f),
+                            neu.bevelLight.copy(alpha = 0.9f)
+                        ),
+                        start = Offset.Zero,
+                        end = Offset(size.width, size.height)
+                    ),
+                    topLeft = Offset(0.5f, 0.5f),
+                    size = Size(size.width - 1f, size.height - 1f),
+                    cornerRadius = r,
+                    style = Stroke(1.2f)
+                )
+            }
             .border(1.dp, borderColor, RoundedCornerShape(10.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
