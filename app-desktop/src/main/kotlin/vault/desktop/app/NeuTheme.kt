@@ -47,7 +47,7 @@ val LightNeu = NeuColors(
     hoverBg = Color(0xFFE9EBF2),
     error = Color(0xFFEF4444),
     accent = Color(0xFF3FB598),
-    insetBg = Color(0xFFE9ECF3),
+    insetBg = Color(0xFFDDE3EE),
     bevelDark = Color(0xFFB4BDCE),
     bevelLight = Color(0xFFFFFFFF)
 )
@@ -65,7 +65,7 @@ val DarkNeu = NeuColors(
     hoverBg = Color(0xFF333844),
     error = Color(0xFFEF4444),
     accent = Color(0xFF4ECFAE),
-    insetBg = Color(0xFF191C24),
+    insetBg = Color(0xFF14161D),
     bevelDark = Color(0xFF0D0F14),
     bevelLight = Color(0xFF3C4351)
 )

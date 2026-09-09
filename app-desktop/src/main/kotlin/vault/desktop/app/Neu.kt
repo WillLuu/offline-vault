@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
 // ============================================================================
@@ -116,7 +117,7 @@ fun NeuField(
                 drawRoundRect(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            neu.bevelDark.copy(alpha = 0.6f),
+                            neu.bevelDark.copy(alpha = 0.85f),
                             neu.bevelLight.copy(alpha = 0.9f)
                         ),
                         start = Offset.Zero,
@@ -125,7 +126,7 @@ fun NeuField(
                     topLeft = Offset(0.5f, 0.5f),
                     size = Size(size.width - 1f, size.height - 1f),
                     cornerRadius = r,
-                    style = Stroke(1.2f)
+                    style = Stroke(2f)
                 )
             }
             .border(1.dp, borderColor, RoundedCornerShape(10.dp))
@@ -258,25 +259,33 @@ fun NeuIconButton(
     ) { content() }
 }
 
-/** 行内文字按钮（低强调操作）。 */
+/** 次级功能按钮：白底凸起胶囊（hover 抬升、按下下沉），统一"功能键必凸"。 */
 @Composable
 fun NeuTextButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val neu = LocalNeu.current
     val iso = remember { MutableInteractionSource() }
     val hovered by iso.collectIsHoveredAsState()
-    Text(
-        text,
-        color = neu.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier
-            .clickable(interactionSource = iso, indication = null, onClick = onClick)
-            .hoverable(iso)
-            .background(
-                if (hovered) neu.hoverBg else Color.Transparent,
-                RoundedCornerShape(8.dp)
-            )
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+    val pressed by iso.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, label = "subBtnScale")
+    val shadow by animateDpAsState(
+        if (pressed) 0.5.dp else if (hovered) 3.dp else 1.5.dp, label = "subBtnShadow"
     )
+    val pillShape = RoundedCornerShape(10.dp)
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                shape = pillShape
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = shadow.toPx()
+            }
+            .background(neu.surface, pillShape)
+            .clickable(interactionSource = iso, indication = null, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = neu.primary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    }
 }
 
 // ---------------- 对话框壳：浮起最高的白底大圆角卡 ----------------

@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -516,13 +517,14 @@ private fun NavItem(label: String, count: Int, selected: Boolean, onClick: () ->
     val hovered by iso.collectIsHoveredAsState()
     val neu = LocalNeu.current
     val bg = when {
-        selected -> neu.primary.copy(alpha = 0.15f)
+        selected -> neu.surface
         hovered -> neu.hoverBg
         else -> Color.Transparent
     }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (selected) Modifier.shadow(2.dp, RoundedCornerShape(12.dp)) else Modifier)
             .hoverable(iso)
             .clickable(interactionSource = iso, indication = null, onClick = onClick)
             .background(bg, RoundedCornerShape(12.dp))
@@ -698,14 +700,7 @@ private fun SortMenu(current: SortKey, onSelect: (SortKey) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val neu = LocalNeu.current
     Box {
-        Text(
-            "▾ ${SortOptions.first { it.first == current }.second}",
-            fontSize = 13.sp, color = neu.onSurface, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { open = !open }
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-        )
+        NeuTextButton("▾ ${SortOptions.first { it.first == current }.second}") { open = !open }
         DropdownMenu(open, { open = false }) {
             SortOptions.forEach { (k, label) ->
                 DropdownMenuItem(text = { Text(label) }, onClick = { onSelect(k); open = false })
