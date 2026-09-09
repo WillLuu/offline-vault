@@ -336,7 +336,7 @@ private fun InitScreen(model: AppModel) {
     UnlockCard(model) {
         NeuField(p1, { p1 = it }, hint = "主密码", isPassword = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(12.dp))
-        NeuField(p2, { p2 = it }, hint = "确认主密码", isPassword = true, modifier = Modifier.fillMaxWidth())
+        NeuField(p2, { p2 = it }, hint = "确认主密码", isPassword = true, modifier = Modifier.fillMaxWidth(), onEnter = { model.initialize(p1) })
         if (model.unlockError != null) {
             Spacer(Modifier.height(8.dp))
             Text(model.unlockError!!, color = neu.error, fontSize = 13.sp)
@@ -361,7 +361,7 @@ private fun UnlockPanel(model: AppModel) {
     val neu = LocalNeu.current
     var pw by remember { mutableStateOf("") }
     UnlockCard(model) {
-        NeuField(pw, { pw = it }, hint = "主密码", isPassword = true, modifier = Modifier.fillMaxWidth())
+        NeuField(pw, { pw = it }, hint = "主密码", isPassword = true, modifier = Modifier.fillMaxWidth(), onEnter = { model.unlock(pw); pw = "" })
         if (model.unlockError != null) {
             Spacer(Modifier.height(8.dp))
             Text(model.unlockError!!, color = neu.error, fontSize = 13.sp)

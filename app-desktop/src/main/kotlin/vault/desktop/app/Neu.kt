@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
@@ -88,6 +90,7 @@ fun NeuField(
     singleLine: Boolean = true,
     minLines: Int = 1,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    onEnter: (() -> Unit)? = null,
 ) {
     val neu = LocalNeu.current
     val iso = remember { MutableInteractionSource() }
@@ -112,7 +115,10 @@ fun NeuField(
             cursorBrush = SolidColor(neu.primary),
             visualTransformation = if (isPassword) PasswordVisualTransformation()
             else VisualTransformation.None,
-            keyboardOptions = keyboardOptions,
+            keyboardOptions = if (onEnter != null)
+                keyboardOptions.copy(imeAction = ImeAction.Done) else keyboardOptions,
+            keyboardActions = if (onEnter != null)
+                KeyboardActions(onDone = { onEnter() }) else KeyboardActions.Default,
             interactionSource = iso,
             decorationBox = { inner ->
                 Box(
