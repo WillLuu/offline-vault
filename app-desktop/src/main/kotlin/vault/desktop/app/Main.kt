@@ -64,7 +64,7 @@ fun main() {
             undecorated = true,
             resizable = true,
         ) {
-            NeuTheme {
+            NeuTheme(model.themeMode) {
                 Column(Modifier.fillMaxSize().background(LocalNeu.current.bg)) {
                     TitleBar(ws, onExit)
                     AppRoot(model)

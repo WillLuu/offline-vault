@@ -13,7 +13,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.IndicationInstance
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -90,7 +89,7 @@ fun NeuSurface(
         shape = RoundedCornerShape(cornerRadius),
         color = neu.surface,
         shadowElevation = elevation,
-        border = if (isSystemInDarkTheme()) BorderStroke(1.dp, neu.border) else null
+        border = if (neu.isDark) BorderStroke(1.dp, neu.border) else null
     ) {
         Box(Modifier.padding(contentPadding)) { content() }
     }

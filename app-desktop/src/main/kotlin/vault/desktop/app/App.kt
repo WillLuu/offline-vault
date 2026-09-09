@@ -78,6 +78,15 @@ class AppModel(private val vault: DesktopVault) {
     var selectedDetail by mutableStateOf<PasswordEntryRow?>(null)
     var search by mutableStateOf("")
     var sortBy by mutableStateOf(SortKey.UPDATED_DESC)
+
+    /** 配色主题（0 浅色 / 1 深色 / 2 莫兰迪），Preferences 持久化，不动 .vault 格式 */
+    var themeMode by mutableStateOf(
+        java.util.prefs.Preferences.userRoot().node("offline-vault-desktop").getInt("themeMode", 0)
+    )
+    fun setTheme(mode: Int) {
+        themeMode = mode
+        java.util.prefs.Preferences.userRoot().node("offline-vault-desktop").putInt("themeMode", mode)
+    }
     var categoryFilter by mutableStateOf<Long?>(null)
 
     var autoLockSec by mutableStateOf(60)
@@ -810,6 +819,19 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
                 val l = lockSec.toIntOrNull(); val c = clipSec.toIntOrNull()
                 if (l == null || c == null || l < 0 || c < 0) msg = "请输入非负整数"
                 else model.saveSettings(l, c) { msg = it }
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+            Spacer(Modifier.height(14.dp))
+            Text("配色主题（与手机端同款色板）", fontSize = 15.sp,
+                fontWeight = FontWeight.Bold, color = neu.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                NeuThemeNames.forEachIndexed { i, label ->
+                    if (model.themeMode == i) NeuButton(label) { }
+                    else NeuTextButton(label) { model.setTheme(i) }
+                }
             }
 
             Spacer(Modifier.height(18.dp))
