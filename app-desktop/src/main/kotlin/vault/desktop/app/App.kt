@@ -311,6 +311,7 @@ private fun UnlockCard(model: AppModel, content: @Composable ColumnScope.() -> U
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         NeuSurface(
             cornerRadius = 26.dp,
+            elevation = 4.dp,
             modifier = Modifier.width(420.dp),
             contentPadding = PaddingValues(horizontal = 32.dp, vertical = 40.dp)
         ) {
@@ -546,8 +547,12 @@ private fun EntryCard(entry: PasswordEntryRow, selected: Boolean, onClick: () ->
     val iso = remember { MutableInteractionSource() }
     val hovered by iso.collectIsHoveredAsState()
     val neu = LocalNeu.current
+    val cardElev by androidx.compose.animation.core.animateDpAsState(
+        if (hovered) 5.dp else 2.dp, label = "cardElev"
+    )
     NeuSurface(
         cornerRadius = 18.dp,
+        elevation = cardElev,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 5.dp)
