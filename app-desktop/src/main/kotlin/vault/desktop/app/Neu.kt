@@ -248,11 +248,12 @@ fun NeuButton(
                 shadowElevation = shadow.toPx()
             }
             .drawBehind {
-                // 唇边画在最底层，面色背景覆盖其上 → 只有底部一圈深色侧壁可见
+                // 唇边画在最底层，面色背景覆盖其上 → 只有侧壁方向露出的一弯可见。
+                // 光源左上 → 壁厚朝右下方露出，方向与水平成 60°（dx=cos60, dy=sin60）
                 val lip = 3.dp.toPx()
                 drawRoundRect(
                     color = lipColor,
-                    topLeft = Offset(0f, lip),
+                    topLeft = Offset(lip * 0.5f, lip * 0.866f),
                     size = Size(size.width, size.height),
                     cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
                 )
