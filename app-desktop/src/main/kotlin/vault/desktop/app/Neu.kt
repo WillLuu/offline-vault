@@ -1,16 +1,18 @@
 package vault.desktop.app
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.Indication
+import androidx.compose.foundation.IndicationInstance
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,15 +40,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -104,37 +111,56 @@ fun NeuField(
 ) {
     val neu = LocalNeu.current
     val iso = remember { MutableInteractionSource() }
-    val focused by iso.collectIsFocusedAsState()
-    val borderColor = if (focused) neu.primary else neu.border
+    val focusRequester = remember { FocusRequester() }
 
     Box(
         modifier = modifier
             .background(neu.insetBg, RoundedCornerShape(10.dp))
             .drawBehind {
-                // 凹陷浮雕：沿圆角描边画 1px 斜向渐变线（左上暗、右下亮）——
-                // 纯描边零模糊，视觉即"压进面板"
-                val r = CornerRadius(10.dp.toPx(), 10.dp.toPx())
-                drawRoundRect(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            neu.bevelDark.copy(alpha = 0.85f),
-                            neu.bevelLight.copy(alpha = 0.9f)
+                // 柔和凹陷：不用单条硬描边，而是沿内缘叠 4 圈低透明度描边，
+                // 每圈向内收 1.6px、alpha 平方衰减；颜色走竖向渐变
+                // （顶暗 → 中部透明 → 底微亮），模拟真实内阴影的渐隐，无轮廓线
+                val passes = 4
+                val rBase = 10.dp.toPx()
+                for (i in 0 until passes) {
+                    val inset = 0.6f + i * 1.6f
+                    val t = 1f - i.toFloat() / passes
+                    val a = t * t * 0.42f
+                    val w = size.width - inset * 2f
+                    val h = size.height - inset * 2f
+                    if (w <= 0f || h <= 0f) break
+                    drawRoundRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                neu.bevelDark.copy(alpha = a),
+                                Color.Transparent,
+                                neu.bevelLight.copy(alpha = a * 0.5f)
+                            ),
+                            startY = inset,
+                            endY = inset + h
                         ),
-                        start = Offset.Zero,
-                        end = Offset(size.width, size.height)
-                    ),
-                    topLeft = Offset(0.5f, 0.5f),
-                    size = Size(size.width - 1f, size.height - 1f),
-                    cornerRadius = r,
-                    style = Stroke(2f)
-                )
+                        topLeft = Offset(inset, inset),
+                        size = Size(w, h),
+                        cornerRadius = CornerRadius(
+                            (rBase - i * 1.2f).coerceAtLeast(2f),
+                            (rBase - i * 1.2f).coerceAtLeast(2f)
+                        ),
+                        style = Stroke(width = 1.4f)
+                    )
+                }
             }
-            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+            // 整框可点：点内边距空白处也聚焦并落光标（文字区由 BasicTextField 自己处理）
+            // indication = null：关掉默认涟漪/悬浮高亮层
+            .clickable(interactionSource = iso, indication = null) { focusRequester.requestFocus() }
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
+        // BasicTextField 的文本选择区自带默认 indication（矩形 hover/按压高亮层），
+        // 会在凹陷上叠出一块"大方框背影"——在其作用域内置空 LocalIndication
+        CompositionLocalProvider(LocalIndication provides NoIndication) {
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
+            modifier = Modifier.focusRequester(focusRequester).fillMaxWidth(),
             singleLine = singleLine,
             minLines = minLines,
             textStyle = TextStyle(
@@ -165,10 +191,22 @@ fun NeuField(
                 }
             }
         )
+        }
     }
 }
 
-/** 层级 3：主操作按钮。主紫填充白字；hover 抬升投影，按下缩放 0.96 + 投影收缩。 */
+/** 空 indication：drawIndication 什么都不画，吞掉组件内部默认的高亮/涟漪层 */
+private object NoIndication : Indication {
+    private val instance = object : IndicationInstance {
+        override fun ContentDrawScope.drawIndication() {}
+    }
+    @Composable
+    override fun rememberUpdatedInstance(
+        interactionSource: InteractionSource
+    ): IndicationInstance = instance
+}
+
+/** 层级 3：主操作按钮。主紫填充白字；hover 提亮、按下加深；投影恒定无变换。 */
 @Composable
 fun NeuButton(
     text: String,
@@ -182,15 +220,19 @@ fun NeuButton(
     val iso = remember { MutableInteractionSource() }
     val hovered by iso.collectIsHoveredAsState()
     val pressed by iso.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, label = "btnScale")
-    val shadow by animateDpAsState(
-        if (pressed) 1.dp else if (hovered) 4.dp else 2.dp, label = "btnShadow"
-    )
+    // 投影恒定 + 禁用缩放变换：桌面端 graphicsLayer 的 shadowElevation 按未缩放
+    // 的原始轮廓绘制，按下缩放会让投影"脱胶"露在按钮外圈，形成明显深色边缘。
+    // 按压反馈改由按钮自身颜色加深承担（纯内部变化，不产生外圈）。
+    val shadow = 2.dp
 
+    // 全部用不透明混色：半透明填充会让图层投影从内部透出来，形成边缘暗圈
     val bg = when {
-        !enabled -> neu.onSurfaceVariant.copy(alpha = 0.4f)
-        danger -> if (hovered) neu.error else neu.error.copy(alpha = 0.88f)
-        hovered -> neu.primary.copy(alpha = 0.88f)
+        !enabled -> lerp(neu.surface, neu.onSurfaceVariant, 0.4f)
+        danger && pressed -> lerp(neu.surface, neu.error, 0.7f)
+        danger && hovered -> neu.error
+        danger -> lerp(neu.surface, neu.error, 0.88f)
+        pressed -> lerp(neu.surface, neu.primary, 0.75f)
+        hovered -> lerp(neu.surface, neu.primary, 0.88f)
         else -> neu.primary
     }
     val btnShape = RoundedCornerShape(12.dp)
@@ -199,8 +241,6 @@ fun NeuButton(
         modifier = modifier
             .graphicsLayer {
                 shape = btnShape            // 关键：不设 shape 投影按矩形轮廓画，圆角下露白直角
-                scaleX = scale
-                scaleY = scale
                 shadowElevation = shadow.toPx()
             }
             .clickable(interactionSource = iso, indication = null, enabled = enabled, onClick = onClick)
@@ -228,7 +268,7 @@ fun PrimaryButton(
     NeuButton(text, modifier = modifier.fillMaxWidth(), enabled = enabled, onClick = onClick)
 }
 
-/** 圆形图标钮：白底浮起，hover 投影加大，按下微缩。 */
+/** 圆形图标钮：白底浮起（投影恒定），按下底色变灰。 */
 @Composable
 fun NeuIconButton(
     onClick: () -> Unit,
@@ -238,48 +278,37 @@ fun NeuIconButton(
 ) {
     val neu = LocalNeu.current
     val iso = remember { MutableInteractionSource() }
-    val hovered by iso.collectIsHoveredAsState()
     val pressed by iso.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.94f else 1f, label = "iconScale")
-    val shadow by animateDpAsState(if (hovered) 3.dp else 1.dp, label = "iconShadow")
+    val shadow = 1.5.dp   // 恒定投影；不做缩放（缩放与投影轮廓不同步会露出外圈）
 
     Box(
         modifier = modifier
             .size(sizeDp)
             .graphicsLayer {
                 shape = CircleShape         // 同上：投影跟随圆形轮廓
-                scaleX = scale
-                scaleY = scale
                 shadowElevation = shadow.toPx()
             }
             .clickable(interactionSource = iso, indication = null, onClick = onClick)
-            .hoverable(iso)
-            .background(neu.surface, CircleShape),
+            .background(if (pressed) neu.hoverBg else neu.surface, CircleShape),
         contentAlignment = Alignment.Center
     ) { content() }
 }
 
-/** 次级功能按钮：白底凸起胶囊（hover 抬升、按下下沉），统一"功能键必凸"。 */
+/** 次级功能按钮：白底凸起胶囊（投影恒定，按下底色变灰），统一"功能键必凸"。 */
 @Composable
 fun NeuTextButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val neu = LocalNeu.current
     val iso = remember { MutableInteractionSource() }
-    val hovered by iso.collectIsHoveredAsState()
     val pressed by iso.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, label = "subBtnScale")
-    val shadow by animateDpAsState(
-        if (pressed) 0.5.dp else if (hovered) 3.dp else 1.5.dp, label = "subBtnShadow"
-    )
+    val shadow = 1.5.dp   // 恒定投影；不做缩放（缩放与投影轮廓不同步会露出外圈）
     val pillShape = RoundedCornerShape(10.dp)
     Box(
         modifier = modifier
             .graphicsLayer {
                 shape = pillShape
-                scaleX = scale
-                scaleY = scale
                 shadowElevation = shadow.toPx()
             }
-            .background(neu.surface, pillShape)
+            .background(if (pressed) neu.hoverBg else neu.surface, pillShape)
             .clickable(interactionSource = iso, indication = null, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
@@ -301,7 +330,11 @@ fun NeuDialogShell(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.35f))
-                .clickable(onClick = onDismiss),
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
             contentAlignment = Alignment.Center
         ) {
             NeuSurface(
@@ -311,7 +344,14 @@ fun NeuDialogShell(
                 contentPadding = PaddingValues(24.dp)
             ) {
                 Column(
-                    modifier = Modifier.clickable(enabled = true, onClick = {}),
+                    // 吞掉面板内点击、防止穿透到遮罩关闭弹窗；
+                    // indication = null：默认涟漪/悬浮高亮层会覆盖整个内容区，
+                    // 鼠标悬浮时显现一块"大方框"边缘（此前弹窗观感问题的真凶）
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
                     content = content
                 )
             }

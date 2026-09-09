@@ -162,9 +162,7 @@ private fun ApplicationScope.TitleBar(ws: WindowState, onExit: () -> Unit) {
         ) {
             Text(
                 "✕", color = if (closeHover) Color.White else neu.onSurfaceVariant, fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clickable(onClick = onExit),
+                modifier = Modifier.size(30.dp),   // 点击由父 Box 处理，此处不再挂 clickable（默认 indication 会画出悬浮高亮）
                 textAlign = TextAlign.Center
             )
         }
