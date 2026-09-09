@@ -548,7 +548,7 @@ private fun EntryCard(entry: PasswordEntryRow, selected: Boolean, onClick: () ->
     val hovered by iso.collectIsHoveredAsState()
     val neu = LocalNeu.current
     val cardElev by androidx.compose.animation.core.animateDpAsState(
-        if (hovered) 5.dp else 2.dp, label = "cardElev"
+        if (hovered) 8.dp else 4.dp, label = "cardElev"
     )
     NeuSurface(
         cornerRadius = 18.dp,

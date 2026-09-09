@@ -168,16 +168,18 @@ fun NeuButton(
         hovered -> neu.primary.copy(alpha = 0.88f)
         else -> neu.primary
     }
+    val btnShape = RoundedCornerShape(12.dp)
 
     Box(
         modifier = modifier
             .graphicsLayer {
+                shape = btnShape            // 关键：不设 shape 投影按矩形轮廓画，圆角下露白直角
                 scaleX = scale
                 scaleY = scale
                 shadowElevation = shadow.toPx()
             }
             .clickable(interactionSource = iso, indication = null, enabled = enabled, onClick = onClick)
-            .background(bg, RoundedCornerShape(12.dp))
+            .background(bg, btnShape)
             .padding(contentPadding),
         contentAlignment = Alignment.Center
     ) {
@@ -220,6 +222,7 @@ fun NeuIconButton(
         modifier = modifier
             .size(sizeDp)
             .graphicsLayer {
+                shape = CircleShape         // 同上：投影跟随圆形轮廓
                 scaleX = scale
                 scaleY = scale
                 shadowElevation = shadow.toPx()
