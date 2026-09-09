@@ -113,16 +113,6 @@ private fun ApplicationScope.TitleBar(ws: WindowState, onExit: () -> Unit) {
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        NeuSurface(cornerRadius = 12.dp,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)) {
-            androidx.compose.material3.Icon(
-                imageVector = fingerprintVector(neu.primary),
-                contentDescription = "秘匣",
-                modifier = Modifier.size(16.dp)
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Text("秘匣 · 密码保险库", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
         Spacer(Modifier.weight(1f))
         // 最大化/还原（透明底，hover 浅灰）
         val maxIso = remember { MutableInteractionSource() }
