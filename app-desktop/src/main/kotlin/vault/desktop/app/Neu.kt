@@ -237,12 +237,25 @@ fun NeuButton(
         else -> neu.primary
     }
     val btnShape = RoundedCornerShape(12.dp)
+    // 底部深色唇边：比面色更深两成的同色"侧壁"，从面色下方露出 3dp。
+    // 实体按键的厚度感来自底部比顶面深，而非四周的浅灰投影。
+    val lipColor = lerp(Color.Black, bg, 0.72f)
 
     Box(
         modifier = modifier
             .graphicsLayer {
                 shape = btnShape            // 关键：不设 shape 投影按矩形轮廓画，圆角下露白直角
                 shadowElevation = shadow.toPx()
+            }
+            .drawBehind {
+                // 唇边画在最底层，面色背景覆盖其上 → 只有底部一圈深色侧壁可见
+                val lip = 3.dp.toPx()
+                drawRoundRect(
+                    color = lipColor,
+                    topLeft = Offset(0f, lip),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
+                )
             }
             .clickable(interactionSource = iso, indication = null, enabled = enabled, onClick = onClick)
             .background(bg, btnShape)
