@@ -25,8 +25,8 @@ private const val LOCKOUT_MAX_MS = 300_000L
 
 class DesktopUnlockManager(private val db: DesktopDb) {
     private val settings = DesktopSettingsStore(db.connection)
-    private val categoryDao = DesktopCategoryDao(db.connection)
     private val session = VaultSession()
+    private val categoryDao = DesktopCategoryDao(db.connection) { session.getActiveDek() }
 
     // 限流计数内存态、不落盘（与 Android 同一 ponytail 权衡：避免自伤锁死 + 不新增持久化面）。
     private var failedAttempts = 0
@@ -49,8 +49,8 @@ class DesktopUnlockManager(private val db: DesktopDb) {
         val wrapped = wrapKey(kek, dek)
         val verifier = makeVerifier(kek)
         settings.writeInitialization(salt, wrapped, verifier)
+        session.unlock(dek) // 先解锁：种子分类名需加密（v2 需 DEK）
         categoryDao.seedDefaultsIfEmpty()
-        session.unlock(dek)
         zeroBytes(kek)
         return true
     }
@@ -69,6 +69,7 @@ class DesktopUnlockManager(private val db: DesktopDb) {
         }
         val dek = settings.unwrapDek(kek)
         session.unlock(dek)
+        migrateVaultDataIfNeededJdbc(db.connection, dek) // v1→v2 数据迁移（幂等；解锁后需 DEK）
         if (!settings.usesDefaultKdf()) {
             settings.getKdfMaterial()?.second?.let { salt ->
                 val kekNew = deriveKey(password, salt, DEFAULT_KDF)

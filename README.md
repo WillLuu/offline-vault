@@ -116,10 +116,10 @@ adb install -r frontend/build/outputs/apk/debug/app-android-debug.apk
 
 ## 已知边界（诚实清单）
 
-- 条目 `name/username` 明文存储（便于搜索），`secret`（密码/网站/备注/词条）全程加密 —— 属设计权衡
+- **v2 全加密**：条目 `name/username` 与分类名均已加密入库（折进 `secret_blob` / `name_blob`），明文列退化为空占位；搜索/排序在解锁后于内存进行。用 SQLite 客户端打开 `vault.db` 只见密文与结构性整数（id/时间戳/category_id）。v1 旧库在下次解锁时静默迁移至 v2（事务内、幂等）
 - 进程被系统回收时无法保证剪贴板清除（系统级限制）；存活场景已用切后台兜底冲刷覆盖
 - 解锁失败限流计数为内存态，进程被杀后归零（离线单机权衡；抗爆破同时依赖 Argon2id 派生成本与 8 位主密码下限）
-- DB 升级迁移：Android `DB_VERSION=1` / 桌面 `PRAGMA user_version=1`，schema 变更须写版本化迁移段（脚手架已就位）
+- DB 升级迁移：Android `DB_VERSION=2` / 桌面 `PRAGMA user_version=2`，v1→v2 结构迁移在开库时执行、数据迁移在解锁后执行（均需版本化迁移段，脚手架已就位）
 - 仓库默认构建为 debug 签名，供学习与侧载；上架商店需替换 release 签名
 
 **桌面端（Windows）特有边界**：

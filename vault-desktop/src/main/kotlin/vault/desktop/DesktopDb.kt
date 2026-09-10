@@ -3,6 +3,7 @@ package vault.desktop
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
+import vault.VAULT_MIGRATE_V1_TO_V2
 import vault.VAULT_SCHEMA_STATEMENTS
 import vault.VaultException
 
@@ -16,7 +17,7 @@ import vault.VaultException
 // 已在用户配置文件 ACL 之下，风险有限。 | 升级阈值：威胁模型要求防同用户其他进程时补 icacls。
 // ============================================================================
 
-const val DESKTOP_DB_VERSION = 1
+const val DESKTOP_DB_VERSION = 2
 
 class DesktopDb private constructor(val connection: Connection, val dbFile: File) {
 
@@ -78,10 +79,11 @@ class DesktopDb private constructor(val connection: Connection, val dbFile: File
                     conn.autoCommit = true
                 }
                 in 1 until DESKTOP_DB_VERSION -> {
-                    // 版本化迁移段（与 Android VaultDbHelper.onUpgrade 同纪律：逐段、事务内、幂等）。
-                    // 当前 DESKTOP_DB_VERSION=1，无历史段；未来加列时按 `if (v < 2) ...` 逐段执行。
+                    // v1→v2 结构迁移（加 name_blob 列、删明文相关索引；无需 DEK）。
+                    // 数据迁移（明文名折进密文）在解锁后由 migrateVaultDataIfNeededJdbc 执行。
                     conn.autoCommit = false
                     try {
+                        conn.createStatement().use { st -> for (stmt in VAULT_MIGRATE_V1_TO_V2) st.execute(stmt) }
                         db.setUserVersion(DESKTOP_DB_VERSION)
                         conn.commit()
                     } catch (e: Exception) { conn.rollback(); throw e }

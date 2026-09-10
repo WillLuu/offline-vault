@@ -3,8 +3,11 @@
 --
 -- 设计铁律（来自架构师）：
 --   1. snake_case；无"为未来扩展"的预留字段（无 sync_status / cloud_id / device_id / etag）。
---   2. name / username 存明文，以支持 SQL `LIKE` 即时搜索与 `ORDER BY` 排序，
---      不要求每条记录都解密（见 api-contract.md §6 搜索排序方案）。
+--   2. 【v2 起】name / username / 分类名 全部加密入库，不再明文：条目真名折进 secret_blob 的
+--      AES-GCM JSON（{n,u,p,w,t,x}），分类真名存于 categories.name_blob；明文 name/username 列
+--      退化为占位空串。搜索/排序/分页在解锁后于内存进行（vault-core Query.filterAndSortEntries）。
+--      故 sqlite 客户端打开 vault.db 只见密文与结构性整数（id/时间戳/category_id/is_deleted/sort_order）。
+--      （v1 曾明文存 name/username 以支持 SQL LIKE/ORDER BY；v1→v2 于解锁后静默迁移，见 VaultMigration。）
 --   3. password / website / notes 合并为 secret_blob，由加密层整体做 AES-256-GCM 加密
 --      （遵循需求中"notes 建议整体加密"的指引，统一加密所有敏感字段）。
 --   4. 软删除 is_deleted；DEK/KEK/盐/生物识别密钥等敏感材料不在此文件以明文出现，

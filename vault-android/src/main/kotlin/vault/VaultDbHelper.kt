@@ -13,7 +13,7 @@ import android.database.sqlite.SQLiteOpenHelper
 // ============================================================================
 
 private const val DB_NAME = "vault.db"
-private const val DB_VERSION = 1
+private const val DB_VERSION = 2
 
 class VaultDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
     override fun onCreate(db: SQLiteDatabase) {
@@ -28,14 +28,14 @@ class VaultDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null,
 
     // ---- 版本化迁移（审计 2026-09-06 加固）----
     // 规则：schema 变更时递增 DB_VERSION，并在此按 oldVersion→newVersion 逐段执行迁移
-    // （事务内、每段幂等）；永不修改已发布版本的 onCreate 语义。当前 v1 为首发，无历史段。
+    // （事务内、每段幂等）；永不修改已发布版本的 onCreate 语义。
+    // v1→v2（全加密）：仅结构变更（加 name_blob 列、删明文相关索引），无需 DEK；
+    // 数据迁移（明文名折进密文）在解锁后由 migrateVaultDataIfNeeded 执行。
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         android.util.Log.i("VaultDbHelper", "DB upgrade $oldVersion -> $newVersion")
         db.beginTransaction()
         try {
-            // 版本迁移按从小到大顺序执行；v1 为基线，无前置迁移段。
-            // 示例（未来 v2 增加列）：
-            // if (oldVersion < 2) db.execSQL("ALTER TABLE ... ADD COLUMN ...")
+            if (oldVersion < 2) for (stmt in VAULT_MIGRATE_V1_TO_V2) db.execSQL(stmt)
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()

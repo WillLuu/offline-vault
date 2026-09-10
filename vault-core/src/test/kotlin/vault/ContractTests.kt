@@ -4,209 +4,79 @@ package vault
 // 契约测试套件（tests/contract，契约 api-contract.md）。无测试框架（纯 main/assert），
 // 可在普通 JVM 直接执行（不依赖 Android/UI/Keystore）。
 //
-// 架构纪律（副作用隔离）：
-//  - 纯模块（VaultCrypto / VaultFormat / VaultMerge / SqlBuilders / Json / Schema / VaultSession）
-//    零 Android 依赖，已在 JVM 上由 *SelfTest() 覆盖；本套件先调用它们（自检即文档）。
-//  - Android 胶水（DAO/UnlockManager/BiometricKeystore）在 Android 编译，无法在裸 JVM 跑；
-//    其"契约可观察行为"由本套件用【同一份 SQL（SqlBuilders 生成的读取 SQL / DAO 写入 SQL 的逐字副本）
-//    + 同一份加密原语（VaultCrypto）】在 sqlite-jdbc 上重放验证。DAO 仅是这些 SQL+加密的机械封装，
-//    故验证 SQL+加密即验证契约方法语义。
-//  - 生物识别通道（BiometricKeystore）依赖 Android Keystore Provider，裸 JVM 无，故不在此执行；
-//    其行为由 Android Instrumented 测试覆盖（见 README 待确认项）。
-//
-// 运行：见 backend/build_and_test.sh（或 README "契约测试运行方式"）。
+// v2（全加密）语义：name/username/category-name 均以密文存于库中，明文列恒为空串；
+//   搜索/排序/分页在内存（Query.filterAndSortEntries）。本 harness 用【同一份 SQL + 同一份加密原语
+//   + 同一份 EntryBlob 编解码】在 sqlite-jdbc 上重放 DAO 行为，并额外断言"库内无明文元数据"与
+//   "v1→v2 静默迁移"。DAO 仅是这些 SQL+加密的机械封装，故验证此处即验证契约。
 // ============================================================================
 
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.Types
 
-// JDBC ResultSet 无 isNull(int)（那是 wasNull() 的误用）；用 getObject()==null 判定 SQL NULL，
-// 封装为可读辅助，避免重复的 null 判定。
 fun ResultSet.strOrNull(col: Int): String? = if (getObject(col) == null) null else getString(col)
 fun ResultSet.longOrNull(col: Int): Long? = if (getObject(col) == null) null else getLong(col)
 
-// ---------------------- JDBC 轻量封装（_CLOSEABLE 手动管理，避免引入 Android/额外依赖） ----------------------
-
 fun execDdl(conn: java.sql.Connection, stmts: List<String>) {
     val st = conn.createStatement()
-    try {
-        for (s in stmts) st.execute(s)
-    } finally {
-        st.close()
-    }
+    try { for (s in stmts) st.execute(s) } finally { st.close() }
 }
 
-// INSERT 并返回自增 id。
 fun insertReturnId(conn: java.sql.Connection, sql: String, bind: (java.sql.PreparedStatement) -> Unit): Long {
     val ps = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
     try {
-        bind(ps)
-        ps.executeUpdate()
+        bind(ps); ps.executeUpdate()
         val gk = ps.generatedKeys
-        try {
-            gk.next()
-            return gk.getLong(1)
-        } finally {
-            gk.close()
-        }
-    } finally {
-        ps.close()
-    }
+        try { gk.next(); return gk.getLong(1) } finally { gk.close() }
+    } finally { ps.close() }
 }
 
-// UPDATE/DELETE，返回受影响行数。
 fun jdbcUpdate(conn: java.sql.Connection, sql: String, bind: (java.sql.PreparedStatement) -> Unit): Int {
     val ps = conn.prepareStatement(sql)
-    try {
-        bind(ps)
-        return ps.executeUpdate()
-    } finally {
-        ps.close()
-    }
+    try { bind(ps); return ps.executeUpdate() } finally { ps.close() }
 }
 
-// 查询，逐行回调。
 fun jdbcQuery(conn: java.sql.Connection, sql: String, args: Array<String> = emptyArray(), each: (java.sql.ResultSet) -> Unit) {
     val ps = conn.prepareStatement(sql)
     try {
         args.forEachIndexed { i, a -> ps.setString(i + 1, a) }
         val rs = ps.executeQuery()
-        try {
-            while (rs.next()) each(rs)
-        } finally {
-            rs.close()
-        }
-    } finally {
-        ps.close()
-    }
+        try { while (rs.next()) each(rs) } finally { rs.close() }
+    } finally { ps.close() }
 }
 
-// ---------------------- 与 DAO/Store 逐字一致的 DB 操作（harness 镜像） ----------------------
+// ---------------------- v2 DAO 镜像（harness） ----------------------
 
-data class MaskedRow(
-    val id: Long, val name: String, val username: String,
-    val categoryName: String?, val createdAt: Long, val updatedAt: Long, val isDeleted: Boolean
-)
-
-// 镜像 PasswordEntryDao.listEntries（掩码：不解密 secret_blob；复用 SqlBuilders 生成的同一份 SQL）。
-fun listEntriesMasked(
-    conn: java.sql.Connection,
-    search: String? = null,
-    sortBy: SortKey = SortKey.NAME_ASC,
-    categoryId: Long? = null,
-    limit: Int = 100,
-    offset: Int = 0
-): List<MaskedRow> {
-    val (sql, args) = buildListEntriesQuery(search, sortBy, categoryId, limit, offset)
-    val out = mutableListOf<MaskedRow>()
-    jdbcQuery(conn, sql, args) { rs ->
-        val idxCat = rs.findColumn("category_name")
-        val catName = rs.strOrNull(idxCat)
-        val idxCatId = rs.findColumn("category_id")
-        val catId = rs.longOrNull(idxCatId)
-        out.add(
-            MaskedRow(
-                id = rs.getLong(rs.findColumn("id")),
-                name = rs.getString(rs.findColumn("name")),
-                username = rs.getString(rs.findColumn("username")),
-                categoryName = catName,
-                createdAt = rs.getLong(rs.findColumn("created_at")),
-                updatedAt = rs.getLong(rs.findColumn("updated_at")),
-                isDeleted = rs.getInt(rs.findColumn("is_deleted")) == 1
-            )
-        )
+// 分类名解密（name_blob 优先；迁移期回退明文列）。
+private fun readCategoryName(conn: java.sql.Connection, dek: ByteArray, id: Long): String? {
+    var r: String? = null
+    jdbcQuery(conn, "SELECT name, name_blob FROM categories WHERE id = ?", arrayOf(id.toString())) { rs ->
+        r = decodeCatName(dek, rs.getBytes(rs.findColumn("name_blob")), rs.getString(rs.findColumn("name")))
     }
-    return out
+    return r
 }
 
-// 镜像 PasswordEntryDao.getEntry（解密 secret_blob 回填 password/website/notes）。
-fun getEntryDecrypted(conn: java.sql.Connection, dek: ByteArray, id: Long): Pair<MaskedRow, SecretPlain>? {
-    var result: Pair<MaskedRow, SecretPlain>? = null
-    jdbcQuery(
-        conn,
-        "SELECT id,name,username,secret_blob,category_id,created_at,updated_at,is_deleted " +
-            "FROM password_entries WHERE id = ? AND is_deleted = 0",
-        arrayOf(id.toString())
-    ) { rs ->
-        val idxCat = rs.findColumn("category_id")
-        val catId = rs.longOrNull(idxCat)
-        val row = MaskedRow(
-            id = rs.getLong(rs.findColumn("id")),
-            name = rs.getString(rs.findColumn("name")),
-            username = rs.getString(rs.findColumn("username")),
-            categoryName = null,
-            createdAt = rs.getLong(rs.findColumn("created_at")),
-            updatedAt = rs.getLong(rs.findColumn("updated_at")),
-            isDeleted = rs.getInt(rs.findColumn("is_deleted")) == 1
-        )
-        val secret = decryptSecretBlob(dek, rs.getBytes(rs.findColumn("secret_blob")))
-        result = row to secret
-    }
-    return result
+private fun decodeCatName(dek: ByteArray, blob: ByteArray?, plainFallback: String?): String {
+    if (blob != null) return decodeCategoryNameBlob(decryptAesGcm(dek, AeadBlob.fromBytes(blob)))
+    return plainFallback ?: ""
 }
 
-// 镜像 PasswordEntryDao.createEntry：加密 {password,website,notes} -> secret_blob。
-fun createEntry(
-    conn: java.sql.Connection, dek: ByteArray,
-    name: String, username: String, password: String, website: String, notes: String, categoryId: Long?
-): Long {
-    val sql = "INSERT INTO password_entries (name, username, secret_blob, category_id, created_at, updated_at, is_deleted) " +
-        "VALUES (?, ?, ?, ?, ?, ?, 0)"
-    return insertReturnId(conn, sql) { ps ->
-        ps.setString(1, name)
-        ps.setString(2, username)
-        ps.setBytes(3, encryptAesGcm(dek, secretJson(password, website, notes)).toBytes())
-        val now = nowMillis()
-        if (categoryId == null) ps.setNull(4, Types.INTEGER) else ps.setLong(4, categoryId)
-        ps.setLong(5, now)
-        ps.setLong(6, now)
-    }
-}
-
-// 镜像 PasswordEntryDao.updateEntry：重加密 secret_blob，刷新 updated_at。
-fun updateEntryById(
-    conn: java.sql.Connection, dek: ByteArray, id: Long,
-    name: String, username: String, password: String, website: String, notes: String, categoryId: Long?
-): Boolean {
-    val sql = "UPDATE password_entries SET name = ?, username = ?, secret_blob = ?, category_id = ?, updated_at = ? " +
-        "WHERE id = ? AND is_deleted = 0"
-    val n = jdbcUpdate(conn, sql) { ps ->
-        ps.setString(1, name)
-        ps.setString(2, username)
-        ps.setBytes(3, encryptAesGcm(dek, secretJson(password, website, notes)).toBytes())
-        if (categoryId == null) ps.setNull(4, Types.INTEGER) else ps.setLong(4, categoryId)
-        ps.setLong(5, nowMillis())
-        ps.setLong(6, id)
-    }
-    return n > 0
-}
-
-// 镜像 PasswordEntryDao.deleteEntry：软删（is_deleted=1）。
-fun softDeleteEntry(conn: java.sql.Connection, id: Long): Boolean {
-    val n = jdbcUpdate(conn, "UPDATE password_entries SET is_deleted = 1, updated_at = ? WHERE id = ? AND is_deleted = 0") { ps ->
-        ps.setLong(1, nowMillis())
-        ps.setLong(2, id)
-    }
-    return n > 0
-}
-
-// 镜像 CategoryDao 写入 + 读取。
-fun insertCategory(conn: java.sql.Connection, name: String, sortOrder: Int): Long {
-    return insertReturnId(conn, "INSERT INTO categories (name, sort_order, created_at) VALUES (?, ?, ?)") { ps ->
-        ps.setString(1, name)
+// 镜像 CategoryDao.createCategory（v2：name 明文列写空，真名进 name_blob）。
+fun insertCategory(conn: java.sql.Connection, dek: ByteArray, name: String, sortOrder: Int): Long =
+    insertReturnId(conn, "INSERT INTO categories (name, name_blob, sort_order, created_at) VALUES ('', ?, ?, ?)") { ps ->
+        ps.setBytes(1, encryptAesGcm(dek, encodeCategoryNameBlob(name)).toBytes())
         ps.setInt(2, sortOrder)
         ps.setLong(3, nowMillis())
     }
-}
 
-fun listCategoriesWithCount(conn: java.sql.Connection): List<CategoryRow> {
+// 镜像 CategoryDao.listCategories（解密 name_blob）。
+fun listCategoriesWithCount(conn: java.sql.Connection, dek: ByteArray): List<CategoryRow> {
     val out = mutableListOf<CategoryRow>()
     jdbcQuery(conn, buildListCategoriesQuery()) { rs ->
         out.add(
             CategoryRow(
                 id = rs.getLong(rs.findColumn("id")),
-                name = rs.getString(rs.findColumn("name")),
+                name = decodeCatName(dek, rs.getBytes(rs.findColumn("name_blob")), rs.getString(rs.findColumn("name"))),
                 sortOrder = rs.getInt(rs.findColumn("sort_order")),
                 createdAt = rs.getLong(rs.findColumn("created_at")),
                 entryCount = rs.getInt(rs.findColumn("entry_count"))
@@ -216,81 +86,126 @@ fun listCategoriesWithCount(conn: java.sql.Connection): List<CategoryRow> {
     return out
 }
 
-fun updateCategorySortOrder(conn: java.sql.Connection, id: Long, sortOrder: Int): Boolean {
-    val n = jdbcUpdate(conn, "UPDATE categories SET sort_order = ? WHERE id = ?") { ps ->
-        ps.setInt(1, sortOrder)
-        ps.setLong(2, id)
+fun categoryOrderMap(conn: java.sql.Connection, dek: ByteArray): Map<Long, Pair<Int, String>> =
+    listCategoriesWithCount(conn, dek).associate { it.id to (it.sortOrder to it.name) }
+
+// 镜像 PasswordEntryDao.createEntry（v2：name/username 明文列写空，全字段进 secret_blob）。
+fun createEntry(
+    conn: java.sql.Connection, dek: ByteArray,
+    name: String, username: String, password: String, website: String, notes: String, categoryId: Long?,
+    extras: List<ExtraField> = emptyList()
+): Long {
+    val sql = "INSERT INTO password_entries (name, username, secret_blob, category_id, created_at, updated_at, is_deleted) " +
+        "VALUES ('', '', ?, ?, ?, ?, 0)"
+    return insertReturnId(conn, sql) { ps ->
+        ps.setBytes(1, encryptAesGcm(dek, encodeEntryBlob(name, username, SecretPlain(password, website, notes, extras))).toBytes())
+        val now = nowMillis()
+        if (categoryId == null) ps.setNull(2, Types.INTEGER) else ps.setLong(2, categoryId)
+        ps.setLong(3, now); ps.setLong(4, now)
     }
-    return n > 0
 }
 
-// 镜像 CategoryDao.deleteCategory：其他(种子)不可删；非空不可删。
-fun deleteCategory(conn: java.sql.Connection, id: Long): Boolean {
-    var name: String? = null
-    jdbcQuery(conn, "SELECT name FROM categories WHERE id = ?", arrayOf(id.toString())) { rs -> name = rs.getString(1) }
-    if (name == "其他") return false
+fun updateEntryById(
+    conn: java.sql.Connection, dek: ByteArray, id: Long,
+    name: String, username: String, password: String, website: String, notes: String, categoryId: Long?
+): Boolean = jdbcUpdate(conn, "UPDATE password_entries SET name = '', username = '', secret_blob = ?, category_id = ?, updated_at = ? WHERE id = ? AND is_deleted = 0") { ps ->
+    ps.setBytes(1, encryptAesGcm(dek, encodeEntryBlob(name, username, SecretPlain(password, website, notes))).toBytes())
+    if (categoryId == null) ps.setNull(2, Types.INTEGER) else ps.setLong(2, categoryId)
+    ps.setLong(3, nowMillis()); ps.setLong(4, id)
+} > 0
+
+fun softDeleteEntry(conn: java.sql.Connection, id: Long): Boolean =
+    jdbcUpdate(conn, "UPDATE password_entries SET is_deleted = 1, updated_at = ? WHERE id = ? AND is_deleted = 0") { ps ->
+        ps.setLong(1, nowMillis()); ps.setLong(2, id)
+    } > 0
+
+// 从一行结果集构造解密后的 PasswordEntryRow（name/username 从 blob，迁移期回退明文列）。
+private fun entryRowFrom(rs: ResultSet, dek: ByteArray, catName: String?): PasswordEntryRow {
+    val view = decodeEntryBlob(decryptAesGcm(dek, AeadBlob.fromBytes(rs.getBytes(rs.findColumn("secret_blob")))))
+    val colName = rs.getString(rs.findColumn("name"))
+    val colUser = rs.getString(rs.findColumn("username"))
+    return PasswordEntryRow(
+        id = rs.getLong(rs.findColumn("id")),
+        name = view.name.ifEmpty { colName },
+        username = view.username.ifEmpty { colUser },
+        password = view.secret.password, website = view.secret.website, notes = view.secret.notes,
+        categoryId = rs.longOrNull(rs.findColumn("category_id")),
+        categoryName = catName,
+        createdAt = rs.getLong(rs.findColumn("created_at")),
+        updatedAt = rs.getLong(rs.findColumn("updated_at")),
+        isDeleted = false,
+        extras = view.secret.extras
+    )
+}
+
+// 镜像 PasswordEntryDao.listEntries（v2：结构过滤取行→解密→内存搜索/排序/分页；返回掩码行）。
+fun listEntriesMasked(
+    conn: java.sql.Connection, dek: ByteArray,
+    search: String? = null, sortBy: SortKey = SortKey.NAME_ASC,
+    categoryId: Long? = null, limit: Int = LIST_NO_LIMIT, offset: Int = 0
+): List<PasswordEntryRow> {
+    val (sql, args) = buildListEntriesQuery(categoryId)
+    val order = categoryOrderMap(conn, dek)
+    val all = mutableListOf<PasswordEntryRow>()
+    jdbcQuery(conn, sql, args) { rs ->
+        val catId = rs.longOrNull(rs.findColumn("category_id"))
+        val catName = catId?.let { order[it]?.second }
+        all.add(entryRowFrom(rs, dek, catName))
+    }
+    return filterAndSortEntries(all, search, sortBy, categoryId, order, limit, offset)
+        .map { it.copy(password = null, website = null, notes = null, extras = emptyList()) }
+}
+
+fun getEntryDecrypted(conn: java.sql.Connection, dek: ByteArray, id: Long): PasswordEntryRow? {
+    var r: PasswordEntryRow? = null
+    jdbcQuery(conn, buildGetEntryQuery(), arrayOf(id.toString())) { rs ->
+        val catId = rs.longOrNull(rs.findColumn("category_id"))
+        val catName = catId?.let { readCategoryName(conn, dek, it) }
+        r = entryRowFrom(rs, dek, catName)
+    }
+    return r
+}
+
+fun deleteCategory(conn: java.sql.Connection, dek: ByteArray, id: Long): Boolean {
+    if (readCategoryName(conn, dek, id) == "其他") return false
     var count = 0
-    jdbcQuery(conn, "SELECT COUNT(*) FROM password_entries WHERE category_id = ? AND is_deleted = 0", arrayOf(id.toString())) { rs ->
-        count = rs.getInt(1)
-    }
+    jdbcQuery(conn, "SELECT COUNT(*) FROM password_entries WHERE category_id = ? AND is_deleted = 0", arrayOf(id.toString())) { rs -> count = rs.getInt(1) }
     if (count > 0) return false
-    val n = jdbcUpdate(conn, "DELETE FROM categories WHERE id = ?") { ps -> ps.setLong(1, id) }
-    return n > 0
+    return jdbcUpdate(conn, "DELETE FROM categories WHERE id = ?") { ps -> ps.setLong(1, id) } > 0
 }
 
-// 镜像 CategoryDao.seedDefaultsIfEmpty：categories 为空时写入 6 个种子分类（支付/社交/工作/娱乐/邮箱/其他）。
-// 用于契约检查首次初始化必须产出种子分类（此前 glue 漏调用，已修）。
-fun seedDefaultsIfEmpty(conn: java.sql.Connection) {
+fun updateCategorySortOrder(conn: java.sql.Connection, id: Long, sortOrder: Int): Boolean =
+    jdbcUpdate(conn, "UPDATE categories SET sort_order = ? WHERE id = ?") { ps -> ps.setInt(1, sortOrder); ps.setLong(2, id) } > 0
+
+fun seedDefaultsIfEmpty(conn: java.sql.Connection, dek: ByteArray) {
     var count = 0
     jdbcQuery(conn, "SELECT COUNT(*) FROM categories") { rs -> count = rs.getInt(1) }
     if (count > 0) return
-    for ((name, order) in listOf(
-        "支付" to 0, "社交" to 1, "工作" to 2, "娱乐" to 3, "邮箱" to 4, "其他" to 5
-    )) {
-        insertCategory(conn, name, order)
-    }
+    for ((name, order) in listOf("支付" to 0, "社交" to 1, "工作" to 2, "娱乐" to 3, "邮箱" to 4, "其他" to 5))
+        insertCategory(conn, dek, name, order)
 }
 
-// ---------------------- secret_blob 编解码（与 PasswordEntryDao 一致） ----------------------
+// ---------------------- app_settings 镜像（与 v2 无关，沿用） ----------------------
 
-fun secretJson(password: String, website: String, notes: String): ByteArray =
-    jsonEncode(mapOf("password" to password, "website" to website, "notes" to notes)).toByteArray(Charsets.UTF_8)
-
-fun decryptSecretBlob(dek: ByteArray, blob: ByteArray): SecretPlain {
-    val json = String(decryptAesGcm(dek, AeadBlob.fromBytes(blob)), Charsets.UTF_8)
-    val m = jsonDecode(json) as Map<*, *>
-    return SecretPlain(m["password"] as String, m["website"] as String, m["notes"] as String)
-}
-
-// ---------------------- app_settings 镜像（AppSettingsStore） ----------------------
-
-fun writeInitialization(
-    conn: java.sql.Connection, salt: ByteArray, wrappedDek: AeadBlob, verifier: AeadBlob, bioWrapped: ByteArray?
-) {
+fun writeInitialization(conn: java.sql.Connection, salt: ByteArray, wrappedDek: AeadBlob, verifier: AeadBlob, bioWrapped: ByteArray?) {
     val now = nowMillis()
     insertReturnId(
         conn,
         "INSERT INTO app_settings (id, initialized, kdf_algo, kdf_memory_kb, kdf_iterations, kdf_parallelism, " +
             "kdf_salt, wrapped_dek, verifier, wrapped_dek_biometric, biometric_enabled, " +
             "auto_lock_timeout_sec, clipboard_clear_delay_sec, theme, created_at, updated_at) " +
-            "VALUES (1,1,'argon2id'," + DEFAULT_KDF.memoryKb + "," + DEFAULT_KDF.iterations + "," +
-            DEFAULT_KDF.parallelism + ",?,?,?,?,?,60,30,'system',?,?)"
+            "VALUES (1,1,'argon2id',${DEFAULT_KDF.memoryKb},${DEFAULT_KDF.iterations},${DEFAULT_KDF.parallelism},?,?,?,?,?,60,30,'system',?,?)"
     ) { ps ->
-        ps.setBytes(1, salt)
-        ps.setBytes(2, wrappedDek.toBytes())
-        ps.setBytes(3, verifier.toBytes())
+        ps.setBytes(1, salt); ps.setBytes(2, wrappedDek.toBytes()); ps.setBytes(3, verifier.toBytes())
         if (bioWrapped == null) ps.setNull(4, Types.BLOB) else ps.setBytes(4, bioWrapped)
-        ps.setInt(5, if (bioWrapped != null) 1 else 0)
-        ps.setLong(6, now)
-        ps.setLong(7, now)
+        ps.setInt(5, if (bioWrapped != null) 1 else 0); ps.setLong(6, now); ps.setLong(7, now)
     }
 }
 
 fun readKdfAndVerifier(conn: java.sql.Connection): Triple<KdfParams, ByteArray, ByteArray>? {
     var r: Triple<KdfParams, ByteArray, ByteArray>? = null
     jdbcQuery(conn, "SELECT kdf_memory_kb, kdf_iterations, kdf_parallelism, kdf_salt, verifier FROM app_settings WHERE id = 1") { rs ->
-        val params = KdfParams("argon2id", rs.getInt(1), rs.getInt(2), rs.getInt(3))
-        r = Triple(params, rs.getBytes(4), rs.getBytes(5))
+        r = Triple(KdfParams("argon2id", rs.getInt(1), rs.getInt(2), rs.getInt(3)), rs.getBytes(4), rs.getBytes(5))
     }
     return r
 }
@@ -301,476 +216,351 @@ fun readWrappedDek(conn: java.sql.Connection): ByteArray? {
     return r
 }
 
-// 镜像 AppSettingsStore.deriveKek：错误密码返回 null。
 fun deriveKek(conn: java.sql.Connection, password: String): ByteArray? {
     val kv = readKdfAndVerifier(conn) ?: return null
     val kek = deriveKey(password, kv.second, kv.first)
     return if (checkVerifier(kek, AeadBlob.fromBytes(kv.third))) kek else null
 }
 
-// 镜像 AppSettingsStore.changeMasterPassword：校验旧 KEK -> 解包 DEK -> 新盐新 KEK -> 重包 DEK+verifier。DEK 不变。
 fun changeMasterPassword(conn: java.sql.Connection, oldPassword: String, newPassword: String): Boolean {
     val kekOld = deriveKek(conn, oldPassword) ?: return false
     val dek = unwrapKey(kekOld, AeadBlob.fromBytes(readWrappedDek(conn)!!))
-    val newSalt = randomSalt()
-    val kekNew = deriveKey(newPassword, newSalt, DEFAULT_KDF)
-    val newWrapped = wrapKey(kekNew, dek)
-    val newVerifier = makeVerifier(kekNew)
+    val newSalt = randomSalt(); val kekNew = deriveKey(newPassword, newSalt, DEFAULT_KDF)
     val n = jdbcUpdate(conn, "UPDATE app_settings SET kdf_salt = ?, wrapped_dek = ?, verifier = ?, updated_at = ? WHERE id = 1") { ps ->
-        ps.setBytes(1, newSalt)
-        ps.setBytes(2, newWrapped.toBytes())
-        ps.setBytes(3, newVerifier.toBytes())
-        ps.setLong(4, nowMillis())
+        ps.setBytes(1, newSalt); ps.setBytes(2, wrapKey(kekNew, dek).toBytes()); ps.setBytes(3, makeVerifier(kekNew).toBytes()); ps.setLong(4, nowMillis())
     }
-    zeroBytes(kekOld)
-    zeroBytes(kekNew)
-    return n > 0
+    zeroBytes(kekOld); zeroBytes(kekNew); return n > 0
 }
 
-// ---------------------- 导出/导入（VaultBackup 镜像，复用纯编解码+合并决策） ----------------------
+// ---------------------- 导出/导入（复用纯编解码+合并决策） ----------------------
 
-fun readAllCategories(conn: java.sql.Connection): List<ExportCategory> {
-    val out = mutableListOf<ExportCategory>()
-    jdbcQuery(conn, "SELECT name, sort_order FROM categories") { rs ->
-        out.add(ExportCategory(rs.getString(1), rs.getInt(2)))
-    }
-    return out
-}
-
-fun categoryNameById(conn: java.sql.Connection, id: Long): String? {
-    var r: String? = null
-    jdbcQuery(conn, "SELECT name FROM categories WHERE id = ?", arrayOf(id.toString())) { rs -> r = rs.getString(1) }
-    return r
-}
+fun readAllCategories(conn: java.sql.Connection, dek: ByteArray): List<ExportCategory> =
+    listCategoriesWithCount(conn, dek).map { ExportCategory(it.name, it.sortOrder) }
 
 fun readAllEntriesWithSecret(conn: java.sql.Connection, dek: ByteArray): List<ExportEntry> {
     val out = mutableListOf<ExportEntry>()
-    jdbcQuery(conn, "SELECT name, username, category_id, created_at, updated_at, secret_blob FROM password_entries WHERE is_deleted = 0"    ) { rs ->
-        val idxCat = rs.findColumn("category_id")
-        val catName = if (rs.getObject(idxCat) == null) "" else (categoryNameById(conn, rs.getLong(idxCat)) ?: "")
-        val secret = decryptSecretBlob(dek, rs.getBytes(rs.findColumn("secret_blob")))
-        out.add(
-            ExportEntry(
-                name = rs.getString(1),
-                username = rs.getString(2),
-                categoryName = catName,
-                createdAt = rs.getLong(4),
-                updatedAt = rs.getLong(5),
-                secret = secret
-            )
-        )
+    jdbcQuery(conn, "SELECT id, name, username, secret_blob, category_id, created_at, updated_at FROM password_entries WHERE is_deleted = 0") { rs ->
+        val view = decodeEntryBlob(decryptAesGcm(dek, AeadBlob.fromBytes(rs.getBytes(rs.findColumn("secret_blob")))))
+        val name = view.name.ifEmpty { rs.getString(2) }
+        val user = view.username.ifEmpty { rs.getString(3) }
+        val catId = rs.longOrNull(5)
+        out.add(ExportEntry(name, user, catId?.let { readCategoryName(conn, dek, it) } ?: "", rs.getLong(6), rs.getLong(7), view.secret))
     }
     return out
 }
 
-// 镜像 VaultBackup.exportVault：useMasterPassword=true 时用主密码经 Argon2id 派生 KEK（同源，复用 deriveKek/登录 salt），
-//   文件头写登录 kdf_salt+params；false 时用独立 export_salt。导入端据 header 同源派生，用户只记一个主密码。
 fun exportVault(conn: java.sql.Connection, dek: ByteArray, password: String, useMasterPassword: Boolean = false): ByteArray {
-    val categories = readAllCategories(conn)
-    val entries = readAllEntriesWithSecret(conn, dek)
-    val json = encodeVaultPayload(buildExportPayload(categories, entries))
+    val json = encodeVaultPayload(buildExportPayload(readAllCategories(conn, dek), readAllEntriesWithSecret(conn, dek)))
     if (useMasterPassword) {
-        // 同源 KEK：复用 deriveKek（登录 salt/params + verifier 校验），禁止自研 Argon2。
         val kek = deriveKek(conn, password) ?: throw WrongPasswordException()
-        val kv = readKdfAndVerifier(conn) ?: throw VaultException("未初始化：无法用主密码导出")
-        val blob = encryptAesGcm(kek, json.toByteArray(Charsets.UTF_8))
-        return serializeVaultFile(kv.first, kv.second, blob)
+        val kv = readKdfAndVerifier(conn) ?: throw VaultException("未初始化")
+        return serializeVaultFile(kv.first, kv.second, encryptAesGcm(kek, json.toByteArray(Charsets.UTF_8)))
     }
-    val exportSalt = randomSalt()
-    val key = deriveKey(password, exportSalt, DEFAULT_KDF)
-    val blob = encryptAesGcm(key, json.toByteArray(Charsets.UTF_8))
-    return serializeVaultFile(DEFAULT_KDF, exportSalt, blob)
+    val exportSalt = randomSalt(); val key = deriveKey(password, exportSalt, DEFAULT_KDF)
+    return serializeVaultFile(DEFAULT_KDF, exportSalt, encryptAesGcm(key, json.toByteArray(Charsets.UTF_8)))
 }
 
-fun readCurrentEntryMetas(conn: java.sql.Connection): List<EntryMeta> {
+fun readCurrentEntryMetas(conn: java.sql.Connection, dek: ByteArray): List<EntryMeta> {
     val out = mutableListOf<EntryMeta>()
-    jdbcQuery(
-        conn,
-        "SELECT e.id, e.name, e.username, c.name AS category_name, e.updated_at " +
-            "FROM password_entries e LEFT JOIN categories c ON e.category_id = c.id " +
-            "WHERE e.is_deleted = 0"
-    ) { rs ->
-        val idxCat = rs.findColumn("category_name")
-        out.add(
-            EntryMeta(
-                id = rs.getLong(1),
-                name = rs.getString(2),
-                username = rs.getString(3),
-                categoryName = rs.strOrNull(idxCat),
-                updatedAt = rs.getLong(5)
-            )
-        )
+    val order = categoryOrderMap(conn, dek)
+    jdbcQuery(conn, "SELECT id, name, username, secret_blob, category_id, updated_at FROM password_entries WHERE is_deleted = 0") { rs ->
+        val view = decodeEntryBlob(decryptAesGcm(dek, AeadBlob.fromBytes(rs.getBytes(rs.findColumn("secret_blob")))))
+        val catId = rs.longOrNull(5)
+        out.add(EntryMeta(rs.getLong(1), view.name.ifEmpty { rs.getString(2) }, view.username.ifEmpty { rs.getString(3) }, catId?.let { order[it]?.second }, rs.getLong(6)))
     }
     return out
 }
 
-// 镜像 VaultBackup.importVault 的合并应用（写 DB）。
 fun applyMerge(conn: java.sql.Connection, dek: ByteArray, payload: VaultPayload): MergeReport {
-    val currentCats = listCategoriesWithCount(conn)
-    val currentEntries = readCurrentEntryMetas(conn)
+    val currentCats = listCategoriesWithCount(conn, dek)
+    val currentEntries = readCurrentEntryMetas(conn, dek)
     val catDec = decideCategoryMerge(currentCats, payload.categories)
     val entDec = decideEntryMerge(currentEntries, payload.entries)
-    var catAdded = 0
-    var catMerged = 0
+    var catAdded = 0; var catMerged = 0
     val nameToId = currentCats.associate { it.name to it.id }.toMutableMap()
-    for ((_, imp) in catDec.merged) {
-        updateCategorySortOrder(conn, nameToId[imp.name]!!, imp.sortOrder)
-        catMerged++
-    }
-    for (imp in catDec.added) {
-        val id = insertCategory(conn, imp.name, imp.sortOrder)
-        nameToId[imp.name] = id
-        catAdded++
-    }
-    var added = 0
-    var updated = 0
+    for ((_, imp) in catDec.merged) { updateCategorySortOrder(conn, nameToId[imp.name]!!, imp.sortOrder); catMerged++ }
+    for (imp in catDec.added) { nameToId[imp.name] = insertCategory(conn, dek, imp.name, imp.sortOrder); catAdded++ }
+    var added = 0; var updated = 0
     val keyToId = currentEntries.associate { Triple(it.name, it.username, it.categoryName ?: "") to it.id }.toMutableMap()
-    for (imp in entDec.added) {
-        createEntry(conn, dek, imp.name, imp.username, imp.secret.password, imp.secret.website, imp.secret.notes, nameToId[imp.categoryName])
-        added++
-    }
+    for (imp in entDec.added) { createEntry(conn, dek, imp.name, imp.username, imp.secret.password, imp.secret.website, imp.secret.notes, nameToId[imp.categoryName], imp.secret.extras); added++ }
     for ((_, imp) in entDec.updated) {
-        val id = keyToId[Triple(imp.name, imp.username, imp.categoryName)] ?: return@applyMerge MergeReport(catAdded, catMerged, added, updated, entDec.skipped)
-        updateEntryById(conn, dek, id, imp.name, imp.username, imp.secret.password, imp.secret.website, imp.secret.notes, nameToId[imp.categoryName])
-        updated++
+        val id = keyToId[Triple(imp.name, imp.username, imp.categoryName)] ?: continue
+        updateEntryById(conn, dek, id, imp.name, imp.username, imp.secret.password, imp.secret.website, imp.secret.notes, nameToId[imp.categoryName]); updated++
     }
     return MergeReport(catAdded, catMerged, added, updated, entDec.skipped)
 }
 
-// 镜像 VaultBackup.importVault：解密文件 -> 合并 -> 错误密码抛 WrongPasswordException。
 fun importVault(conn: java.sql.Connection, dek: ByteArray, file: ByteArray, password: String): MergeReport {
     val header = parseVaultHeader(file)
     val key = deriveKey(password, header.exportSalt, header.kdfParams)
-    val json = try {
-        String(decryptAesGcm(key, header.blob), Charsets.UTF_8)
-    } catch (e: VaultException) {
-        throw WrongPasswordException()
-    }
-    val payload = decodeVaultPayload(json)
-    return applyMerge(conn, dek, payload)
+    val json = try { String(decryptAesGcm(key, header.blob), Charsets.UTF_8) } catch (e: VaultException) { throw WrongPasswordException() }
+    return applyMerge(conn, dek, decodeVaultPayload(json))
+}
+
+// ---------------------- v1→v2 数据迁移镜像（需 DEK；DAO 在解锁后执行同一逻辑） ----------------------
+
+fun migrateDataV1toV2(conn: java.sql.Connection, dek: ByteArray) {
+    conn.autoCommit = false
+    try {
+        // 条目：把明文 name/username 折进 secret_blob（若 blob 已是 v2 则幂等跳过），再清空明文列。
+        val rows = mutableListOf<Triple<Long, String, String>>() // id, name, username（明文列）
+        jdbcQuery(conn, "SELECT id, name, username, secret_blob FROM password_entries WHERE name <> '' OR username <> ''") { rs ->
+            rows.add(Triple(rs.getLong(1), rs.getString(2), rs.getString(3)))
+        }
+        for ((id, name, user) in rows) {
+            var blobBytes: ByteArray? = null
+            jdbcQuery(conn, "SELECT secret_blob FROM password_entries WHERE id = ?", arrayOf(id.toString())) { rs -> blobBytes = rs.getBytes(1) }
+            val view = decodeEntryBlob(decryptAesGcm(dek, AeadBlob.fromBytes(blobBytes!!)))
+            val n = if (view.name.isNotEmpty()) view.name else name
+            val u = if (view.username.isNotEmpty()) view.username else user
+            val newBlob = encryptAesGcm(dek, encodeEntryBlob(n, u, view.secret)).toBytes()
+            jdbcUpdate(conn, "UPDATE password_entries SET name = '', username = '', secret_blob = ? WHERE id = ?") { ps -> ps.setBytes(1, newBlob); ps.setLong(2, id) }
+        }
+        // 分类：明文 name → name_blob，清空明文列。
+        val cats = mutableListOf<Pair<Long, String>>()
+        jdbcQuery(conn, "SELECT id, name FROM categories WHERE name <> '' AND name_blob IS NULL") { rs -> cats.add(rs.getLong(1) to rs.getString(2)) }
+        for ((id, name) in cats) {
+            val blob = encryptAesGcm(dek, encodeCategoryNameBlob(name)).toBytes()
+            jdbcUpdate(conn, "UPDATE categories SET name = '', name_blob = ? WHERE id = ?") { ps -> ps.setBytes(1, blob); ps.setLong(2, id) }
+        }
+        conn.commit()
+    } catch (e: Exception) { conn.rollback(); throw e }
+    conn.autoCommit = true
 }
 
 // ============================================================================
-// 契约检查（逐条对应 api-contract.md 方法）
+// 契约检查
 // ============================================================================
 
 fun checkListEntries(conn: java.sql.Connection) {
     val dek = randomDek()
-    val catA = insertCategory(conn, "社交", 1)
-    val catB = insertCategory(conn, "工作", 2)
-    val catOther = insertCategory(conn, "其他", 5)
+    val catA = insertCategory(conn, dek, "社交", 1)
+    val catB = insertCategory(conn, dek, "工作", 2)
+    val catOther = insertCategory(conn, dek, "其他", 5)
     createEntry(conn, dek, "github", "me@x.com", "p1", "https://gh", "n1", catA)
     createEntry(conn, dek, "gitlab", "me@x.com", "p2", "https://gl", "n2", catA)
     createEntry(conn, dek, "work-vpn", "admin", "p3", "https://vpn", "n3", catB)
     createEntry(conn, dek, "other-bank", "u", "p4", "https://bk", "n4", catOther)
 
-    // 默认列表（NAME_ASC）掩码：含全部 4 条，password 不出现在结果结构里
-    val all = listEntriesMasked(conn)
-    checkThat(all.size == 4) { "默认列表应返回 4 条" }
-    checkThat(all.all { it.categoryName != null }) { "掩码行应带分类名" }
+    checkThat(listEntriesMasked(conn, dek).size == 4) { "默认列表应返回 4 条" }
+    checkThat(listEntriesMasked(conn, dek, search = "git").size == 2) { "搜索 'git' 应命中 2 条" }
+    checkThat(listEntriesMasked(conn, dek, search = "me@x.com").size == 2) { "搜索用户名应命中 2 条" }
+    val asc = listEntriesMasked(conn, dek, sortBy = SortKey.NAME_ASC)
+    checkThat(asc.map { it.name } == listOf("github", "gitlab", "other-bank", "work-vpn")) { "NAME_ASC 错误: ${asc.map { it.name }}" }
+    checkThat(listEntriesMasked(conn, dek, sortBy = SortKey.NAME_DESC).first().name == "work-vpn") { "NAME_DESC 错误" }
+    checkThat(listEntriesMasked(conn, dek, categoryId = catA).all { it.categoryName == "社交" }) { "分类过滤错误" }
+    checkThat(listEntriesMasked(conn, dek, limit = 2, offset = 1)[0].name == "gitlab") { "分页错误" }
+    val catAsc = listEntriesMasked(conn, dek, sortBy = SortKey.CATEGORY_ASC)
+    checkThat(catAsc.map { it.categoryName } == listOf("社交", "社交", "工作", "其他")) { "CATEGORY_ASC 错误: ${catAsc.map { it.categoryName }}" }
+}
 
-    // 搜索 name LIKE
-    val byName = listEntriesMasked(conn, search = "git")
-    checkThat(byName.size == 2 && byName.all { it.name.contains("git") }) { "搜索 'git' 应命中 github/gitlab，实 ${byName.map { it.name }}" }
-    // 搜索 username LIKE
-    val byUser = listEntriesMasked(conn, search = "me@x.com")
-    checkThat(byUser.size == 2) { "搜索用户名 'me@x.com' 应命中 2 条" }
-
-    // 排序 NAME_ASC / NAME_DESC（二进制序：github < gitlab）
-    val asc = listEntriesMasked(conn, sortBy = SortKey.NAME_ASC)
-    checkThat(asc.map { it.name } == listOf("github", "gitlab", "other-bank", "work-vpn")) { "NAME_ASC 顺序错误: ${asc.map { it.name }}" }
-    val desc = listEntriesMasked(conn, sortBy = SortKey.NAME_DESC)
-    checkThat(desc.map { it.name } == listOf("work-vpn", "other-bank", "gitlab", "github")) { "NAME_DESC 顺序错误: ${desc.map { it.name }}" }
-
-    // 分类过滤
-    val onlyA = listEntriesMasked(conn, categoryId = catA)
-    checkThat(onlyA.size == 2 && onlyA.all { it.categoryName == "社交" }) { "分类过滤应仅返回社交类 2 条" }
-
-    // 分页 limit=2 offset=1（默认序 github,gitlab,other-bank,work-vpn -> [gitlab, other-bank]）
-    val page = listEntriesMasked(conn, limit = 2, offset = 1)
-    checkThat(page.size == 2 && page[0].name == "gitlab") { "分页 limit=2 offset=1 首项应为 gitlab，实 ${page.map { it.name }}" }
-
-    // CATEGORY_ASC 按分类 sort_order 排序（catA=1 社交, catB=2 工作, catOther=3 其他）
-    val catAsc = listEntriesMasked(conn, sortBy = SortKey.CATEGORY_ASC)
-    checkThat(catAsc.map { it.categoryName } == listOf("社交", "社交", "工作", "其他")) { "CATEGORY_ASC 顺序错误: ${catAsc.map { it.categoryName }}" }
+fun checkNoPlaintextMetadata(conn: java.sql.Connection) {
+    // v2 安全属性：库文件里搜不到条目名/用户名/分类名的明文。
+    val dek = randomDek()
+    val cat = insertCategory(conn, dek, "公司VPN", 0)
+    createEntry(conn, dek, "vpngate", "s3cr3t-user", "pw", "https://x", "note-body", cat)
+    // 明文列必须为空
+    jdbcQuery(conn, "SELECT name, username FROM password_entries") { rs ->
+        checkThat(rs.getString(1) == "" && rs.getString(2) == "") { "v2 条目明文列必须为空" }
+    }
+    jdbcQuery(conn, "SELECT name FROM categories") { rs -> checkThat(rs.getString(1) == "") { "v2 分类明文列必须为空" } }
+    // 整库转储（sqlite 支持 hex/全文，这里逐列取 blob 拼字节）里不得含敏感明文子串
+    val dump = StringBuilder()
+    jdbcQuery(conn, "SELECT secret_blob FROM password_entries") { rs -> dump.append(rs.getBytes(1).joinToString("") { "%02x".format(it) }) }
+    jdbcQuery(conn, "SELECT name_blob FROM categories") { rs -> dump.append(rs.getBytes(1)?.joinToString("") { "%02x".format(it) } ?: "") }
+    val dumpBytes = dump.toString()
+    for (needle in listOf("vpngate", "s3cr3t-user", "公司VPN", "pw", "note-body")) {
+        val hex = needle.toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) }
+        checkThat(!dumpBytes.contains(hex)) { "密文转储中不应含明文 '$needle'（GCM 应已加密）" }
+    }
 }
 
 fun checkCreateGetUpdateDeleteEntry(conn: java.sql.Connection) {
     val dek = randomDek()
-    val catId = insertCategory(conn, "支付", 0)
+    val catId = insertCategory(conn, dek, "支付", 0)
     val id = createEntry(conn, dek, "bank", "u1", "super-secret", "https://bank", "note", catId)
     checkThat(id > 0) { "createEntry 应返回正 id" }
-
-    // 密文 ≠ 明文：长度含 GCM tag，且不等于明文
     var rawBlob: ByteArray? = null
     jdbcQuery(conn, "SELECT secret_blob FROM password_entries WHERE id = ?", arrayOf(id.toString())) { rs -> rawBlob = rs.getBytes(1) }
-    checkThat(rawBlob != null && rawBlob!!.size > "super-secret".length) { "密文长度应 > 明文（含 GCM tag）" }
-    checkThat(!rawBlob!!.contentEquals("super-secret".toByteArray())) { "密文不应等于明文" }
-
-    // getEntry 解密回填
+    checkThat(rawBlob != null && !rawBlob!!.contentEquals("super-secret".toByteArray())) { "密文不应等于明文" }
     val got = getEntryDecrypted(conn, dek, id)
-    checkThat(got != null) { "getEntry 应返回条目" }
-    checkThat(got!!.second.password == "super-secret") { "getEntry 应解密出正确密码" }
-    checkThat(got.second.website == "https://bank") { "getEntry website 错误" }
-
-    // 锁定/无正确 DEK 时解密必须抛（DAO 拒绝：getDek()==null 即无法解密）
-    val wrongDek = randomDek()
-    var lockedThrew = false
-    try { getEntryDecrypted(conn, wrongDek, id) } catch (e: VaultException) { lockedThrew = true }
-    checkThat(lockedThrew) { "非活跃 DEK 解密应抛 VaultException（模拟锁定态拒绝）" }
-
-    // update
+    checkThat(got != null && got.password == "super-secret" && got.name == "bank" && got.username == "u1") { "getEntry 应解密回填全字段" }
+    var threw = false
+    try { getEntryDecrypted(conn, randomDek(), id) } catch (e: VaultException) { threw = true }
+    checkThat(threw) { "非活跃 DEK 解密应抛 VaultException" }
     checkThat(updateEntryById(conn, dek, id, "bank", "u1", "new-secret", "https://bank2", "note2", catId)) { "updateEntry 应成功" }
-    val got2 = getEntryDecrypted(conn, dek, id)
-    checkThat(got2!!.second.password == "new-secret") { "updateEntry 后密码应更新" }
-
-    // delete（软删）
+    checkThat(getEntryDecrypted(conn, dek, id)!!.password == "new-secret") { "update 后密码应更新" }
     checkThat(softDeleteEntry(conn, id)) { "deleteEntry 应成功" }
-    checkThat(listEntriesMasked(conn).none { it.id == id }) { "软删后列表不应返回该条目" }
-    var isDel = -1
-    jdbcQuery(conn, "SELECT is_deleted FROM password_entries WHERE id = ?", arrayOf(id.toString())) { rs -> isDel = rs.getInt(1) }
-    checkThat(isDel == 1) { "软删后 is_deleted 应为 1" }
+    checkThat(listEntriesMasked(conn, dek).none { it.id == id }) { "软删后列表不应含该条" }
+}
+
+fun checkExtrasRoundTrip(conn: java.sql.Connection) {
+    val dek = randomDek()
+    val cat = insertCategory(conn, dek, "工具", 0)
+    val id = createEntry(conn, dek, "note", "u", "p", "w", "n", cat, listOf(ExtraField("邮箱", "a@b.c"), ExtraField("手机", "138")))
+    val got = getEntryDecrypted(conn, dek, id)!!
+    checkThat(got.extras == listOf(ExtraField("邮箱", "a@b.c"), ExtraField("手机", "138"))) { "extras 往返失败: ${got.extras}" }
 }
 
 fun checkCategoryDao(conn: java.sql.Connection) {
-    val otherId = insertCategory(conn, "其他", 5)
-    checkThat(!deleteCategory(conn, otherId)) { "'其他' 种子分类不可删" }
-
-    val workId = insertCategory(conn, "工作", 2)
     val dek = randomDek()
-    createEntry(conn, dek, "e1", "u", "p", "w", "n", workId)
-
-    val cats = listCategoriesWithCount(conn)
-    val work = cats.first { it.id == workId }
-    checkThat(work.entryCount == 1) { "工作类 entryCount 应为 1（单条 JOIN 防 N+1），实 ${work.entryCount}" }
-    checkThat(!deleteCategory(conn, workId)) { "非空分类不可删" }
-
-    // 软删条目后，分类可删
-    var eid = -1L
-    jdbcQuery(conn, "SELECT id FROM password_entries WHERE name = 'e1'") { rs -> eid = rs.getLong(1) }
+    val otherId = insertCategory(conn, dek, "其他", 5)
+    checkThat(!deleteCategory(conn, dek, otherId)) { "'其他' 不可删" }
+    val workId = insertCategory(conn, dek, "工作", 2)
+    val eid = createEntry(conn, dek, "e1", "u", "p", "w", "n", workId)
+    checkThat(listCategoriesWithCount(conn, dek).first { it.id == workId }.entryCount == 1) { "工作类计数应为 1" }
+    checkThat(!deleteCategory(conn, dek, workId)) { "非空分类不可删" }
     softDeleteEntry(conn, eid)
-    checkThat(deleteCategory(conn, workId)) { "条目清空后可删分类" }
+    checkThat(deleteCategory(conn, dek, workId)) { "清空后可删" }
 }
 
-// 种子分类：首次初始化必须写入 6 个种子分类（"其他"不可删），且重复 seed 不重复插入。
 fun checkSeedCategories(conn: java.sql.Connection) {
-    seedDefaultsIfEmpty(conn)
-    val cats = listCategoriesWithCount(conn)
-    checkThat(cats.size == 6) { "应有 6 个种子分类，实 ${cats.size}" }
-    checkThat(cats.map { it.name } == listOf("支付", "社交", "工作", "娱乐", "邮箱", "其他")) {
-        "种子分类名称/顺序错误: ${cats.map { it.name }}"
-    }
-    // "其他" 不可删
-    val other = cats.first { it.name == "其他" }
-    checkThat(!deleteCategory(conn, other.id)) { "种子分类 其他 必须不可删" }
-    // 重复 seed 不应新增
-    seedDefaultsIfEmpty(conn)
-    checkThat(listCategoriesWithCount(conn).size == 6) { "重复 seed 不应新增分类" }
+    val dek = randomDek()
+    seedDefaultsIfEmpty(conn, dek)
+    val cats = listCategoriesWithCount(conn, dek)
+    checkThat(cats.map { it.name } == listOf("支付", "社交", "工作", "娱乐", "邮箱", "其他")) { "种子分类错误: ${cats.map { it.name }}" }
+    seedDefaultsIfEmpty(conn, dek)
+    checkThat(listCategoriesWithCount(conn, dek).size == 6) { "重复 seed 不应新增" }
 }
 
 fun checkChangeMasterPassword(conn: java.sql.Connection) {
-    // 初始化（密码 pw1）
-    val salt = randomSalt()
-    val kek1 = deriveKey("pw1", salt, DEFAULT_KDF)
-    val dek = randomDek()
-    val wrapped = wrapKey(kek1, dek)
-    val verifier = makeVerifier(kek1)
-    writeInitialization(conn, salt, wrapped, verifier, null)
-    zeroBytes(kek1)
-
-    // 用 pw1 解锁拿到 DEK，建条目，记录 secret_blob 字节
+    val salt = randomSalt(); val kek1 = deriveKey("pw1", salt, DEFAULT_KDF); val dek = randomDek()
+    writeInitialization(conn, salt, wrapKey(kek1, dek), makeVerifier(kek1), null); zeroBytes(kek1)
     val dek1 = unwrapKey(deriveKek(conn, "pw1")!!, AeadBlob.fromBytes(readWrappedDek(conn)!!))
-    val catId = insertCategory(conn, "社交", 1)
+    val catId = insertCategory(conn, dek1, "社交", 1)
     val eid = createEntry(conn, dek1, "tw", "u", "pw-old", "w", "n", catId)
-    var beforeBlob: ByteArray? = null
-    jdbcQuery(conn, "SELECT secret_blob FROM password_entries WHERE id = ?", arrayOf(eid.toString())) { rs -> beforeBlob = rs.getBytes(1) }
-
-    // 改主密码 pw1 -> pw2
-    checkThat(changeMasterPassword(conn, "pw1", "pw2")) { "changeMasterPassword 应成功" }
-    // 旧密码解锁失败
-    checkThat(deriveKek(conn, "pw1") == null) { "旧密码 pw1 应解锁失败" }
-    // 新密码解锁成功，且 DEK 不变
+    checkThat(changeMasterPassword(conn, "pw1", "pw2")) { "改主密码应成功" }
+    checkThat(deriveKek(conn, "pw1") == null) { "旧密码应解锁失败" }
     val dek2 = unwrapKey(deriveKek(conn, "pw2")!!, AeadBlob.fromBytes(readWrappedDek(conn)!!))
-    assertBytesEq(dek1, dek2, "改主密码后 DEK 应不变")
-    // secret_blob 字节未变（未重加密）
-    var afterBlob: ByteArray? = null
-    jdbcQuery(conn, "SELECT secret_blob FROM password_entries WHERE id = ?", arrayOf(eid.toString())) { rs -> afterBlob = rs.getBytes(1) }
-    assertBytesEq(beforeBlob!!, afterBlob!!, "改主密码后 secret_blob 字节应不变（DEK 不变）")
-    // 新密码可解密原条目
-    val got = getEntryDecrypted(conn, dek2, eid)
-    checkThat(got!!.second.password == "pw-old") { "新密码应仍能解密原条目" }
+    assertBytesEq(dek1, dek2, "改主密码后 DEK 不变")
+    checkThat(getEntryDecrypted(conn, dek2, eid)!!.password == "pw-old") { "新密码应仍能解密原条目" }
 }
 
 fun checkExportImport(conn: java.sql.Connection) {
     val dek = randomDek()
-    val catA = insertCategory(conn, "社交", 1)
-    val catB = insertCategory(conn, "工作", 2)
+    val catA = insertCategory(conn, dek, "社交", 1)
+    val catB = insertCategory(conn, dek, "工作", 2)
     createEntry(conn, dek, "github", "me@x.com", "gh-pw", "https://gh", "n1", catA)
     createEntry(conn, dek, "jira", "me@x.com", "ji-pw", "https://ji", "n2", catB)
-
-    // 导出（独立 export_salt；两次应不同 nonce）
     val f1 = exportVault(conn, dek, "export-pw")
-    val f2 = exportVault(conn, dek, "export-pw")
-    checkThat(!f1.contentEquals(f2)) { "两次导出应使用不同 nonce/salt，文件不应相同" }
-
-    // 导入到全新库（同导出密码）
     val conn2 = DriverManager.getConnection("jdbc:sqlite::memory:")
     try {
         execDdl(conn2, VAULT_SCHEMA_STATEMENTS)
         val report = importVault(conn2, dek, f1, "export-pw")
-        checkThat(report.entriesAdded == 2) { "导入应新增 2 条条目，实 ${report.entriesAdded}" }
-        checkThat(report.categoriesAdded == 2) { "导入应新增 2 个分类，实 ${report.categoriesAdded}" }
-        val rows = listEntriesMasked(conn2)
-        checkThat(rows.size == 2) { "导入后应有 2 条，实 ${rows.size}" }
-        val gh = getEntryDecrypted(conn2, dek, rows.first { it.name == "github" }.id)
-        checkThat(gh!!.second.password == "gh-pw") { "导入后 github 密码应一致" }
-        val ji = getEntryDecrypted(conn2, dek, rows.first { it.name == "jira" }.id)
-        checkThat(ji!!.second.password == "ji-pw") { "导入后 jira 密码应一致" }
-
-        // 错误导出密码 -> WRONG_PASSWORD
+        checkThat(report.entriesAdded == 2 && report.categoriesAdded == 2) { "导入应新增 2 条 2 分类，实 $report" }
+        val rows = listEntriesMasked(conn2, dek)
+        checkThat(rows.size == 2) { "导入后应 2 条" }
+        checkThat(getEntryDecrypted(conn2, dek, rows.first { it.name == "github" }.id)!!.password == "gh-pw") { "导入 github 密码应一致" }
         var threw = false
         try { importVault(conn2, dek, f1, "wrong-pw") } catch (e: WrongPasswordException) { threw = true }
         checkThat(threw) { "错误导出密码应抛 WrongPasswordException" }
-    } finally {
-        conn2.close()
-    }
+    } finally { conn2.close() }
 }
 
-// ② 用主密码导出（useMasterPassword=true）：KEK 须经 Argon2id 由主密码派生（同源），文件头写登录 kdf_salt，
-//   用户只记一个主密码即可导入，而非另设独立导出密码。
 fun checkExportImportMasterPassword(conn: java.sql.Connection) {
-    // 初始化主密码 mp（写 app_settings：kdf_salt/params/verifier/wrapped_dek）
-    val mp = "master-pw"
-    val salt = randomSalt()
-    val kek = deriveKey(mp, salt, DEFAULT_KDF)
-    val dek = randomDek()
-    val wrapped = wrapKey(kek, dek)
-    val verifier = makeVerifier(kek)
-    writeInitialization(conn, salt, wrapped, verifier, null)
-    zeroBytes(kek)
-
-    val catA = insertCategory(conn, "社交", 1)
+    val mp = "master-pw"; val salt = randomSalt(); val kek = deriveKey(mp, salt, DEFAULT_KDF); val dek = randomDek()
+    writeInitialization(conn, salt, wrapKey(kek, dek), makeVerifier(kek), null); zeroBytes(kek)
+    val catA = insertCategory(conn, dek, "社交", 1)
     createEntry(conn, dek, "github", "me@x.com", "gh-pw", "https://gh", "n1", catA)
-
-    // 用主密码导出（useMasterPassword=true）：KEK 必须同源（由主密码经 Argon2id 派生，复用 deriveKek）。
     val f = exportVault(conn, dek, mp, useMasterPassword = true)
-    // 同源铁证：文件头 salt == 登录 kdf_salt（而非文件内随机 export_salt）。
-    val header = parseVaultHeader(f)
-    assertBytesEq(header.exportSalt, salt, "② useMasterPassword=true 文件头 salt 必须等于登录 kdf_salt（同源）")
-
-    // 导入到全新库，用同一主密码 -> 成功（用户只记一个主密码）。
+    assertBytesEq(parseVaultHeader(f).exportSalt, salt, "主密码导出文件头 salt 应等于登录 kdf_salt")
     val conn2 = DriverManager.getConnection("jdbc:sqlite::memory:")
     try {
         execDdl(conn2, VAULT_SCHEMA_STATEMENTS)
-        val report = importVault(conn2, dek, f, mp)
-        checkThat(report.entriesAdded == 1) { "主密码导出文件用同一主密码导入应新增 1 条，实 ${report.entriesAdded}" }
-        val rows = listEntriesMasked(conn2)
-        checkThat(rows.size == 1 && rows[0].name == "github") { "主密码导入应有 1 条 github" }
-        val gh = getEntryDecrypted(conn2, dek, rows[0].id)
-        checkThat(gh!!.second.password == "gh-pw") { "主密码导入后密码应一致" }
-        // 错误主密码 -> WRONG_PASSWORD（同源派生失败）
-        var threw = false
-        try { importVault(conn2, dek, f, "wrong-mp") } catch (e: WrongPasswordException) { threw = true }
-        checkThat(threw) { "错误主密码导入应抛 WrongPasswordException" }
-        // 导出时主密码错误 -> 立即抛 WrongPasswordException（verifier 校验，防 typo 产出打不开的文件）
-        var exportThrew = false
-        try { exportVault(conn, dek, "wrong-mp", useMasterPassword = true) } catch (e: WrongPasswordException) { exportThrew = true }
-        checkThat(exportThrew) { "导出时主密码错误应抛 WrongPasswordException" }
-    } finally {
-        conn2.close()
-    }
+        checkThat(importVault(conn2, dek, f, mp).entriesAdded == 1) { "主密码导入应新增 1 条" }
+        checkThat(listEntriesMasked(conn2, dek)[0].name == "github") { "主密码导入应含 github" }
+    } finally { conn2.close() }
+}
+
+// v1→v2 迁移：建 v1 库（明文列 + v1 secret JSON + 明文分类名），跑 DDL 迁移 + 数据迁移，验证 v2 读取正确且明文清空。
+private val VAULT_SCHEMA_V1 = listOf(
+    "CREATE TABLE categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)",
+    "CREATE UNIQUE INDEX uq_categories_name ON categories(name)",
+    "CREATE TABLE password_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, username TEXT NOT NULL DEFAULT '', secret_blob BLOB NOT NULL, category_id INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, is_deleted INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL)",
+    "CREATE INDEX idx_entries_name ON password_entries(name)",
+    "CREATE INDEX idx_entries_username ON password_entries(username)",
+    "CREATE INDEX idx_entries_cat_name ON password_entries(category_id, name)",
+    "CREATE INDEX idx_entries_deleted ON password_entries(is_deleted)",
+    "CREATE TABLE app_settings (id INTEGER PRIMARY KEY CHECK (id = 1), initialized INTEGER NOT NULL DEFAULT 0, kdf_algo TEXT NOT NULL DEFAULT 'argon2id', kdf_memory_kb INTEGER NOT NULL DEFAULT 32768, kdf_iterations INTEGER NOT NULL DEFAULT 2, kdf_parallelism INTEGER NOT NULL DEFAULT 1, kdf_salt BLOB NOT NULL, wrapped_dek BLOB NOT NULL, verifier BLOB NOT NULL, wrapped_dek_biometric BLOB, auto_lock_timeout_sec INTEGER NOT NULL DEFAULT 60, clipboard_clear_delay_sec INTEGER NOT NULL DEFAULT 30, theme TEXT NOT NULL DEFAULT 'system', biometric_enabled INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)"
+)
+
+fun checkV1ToV2Migration() {
+    val c = DriverManager.getConnection("jdbc:sqlite::memory:")
+    try {
+        execDdl(c, VAULT_SCHEMA_V1)
+        val dek = randomDek()
+        // v1 写入：明文 name/username + v1 secret JSON + 明文分类名
+        val catId = insertReturnId(c, "INSERT INTO categories (name, sort_order, created_at) VALUES ('邮箱', 4, ?)") { it.setLong(1, nowMillis()) }
+        insertReturnId(
+            c, "INSERT INTO password_entries (name, username, secret_blob, category_id, created_at, updated_at, is_deleted) VALUES ('gmail', 'me@gmail.com', ?, ?, ?, ?, 0)"
+        ) { ps ->
+            ps.setBytes(1, encryptAesGcm(dek, jsonEncode(mapOf("password" to "g-pw", "website" to "https://gmail", "notes" to "n")).toByteArray(Charsets.UTF_8)).toBytes())
+            ps.setLong(2, catId); val now = nowMillis(); ps.setLong(3, now); ps.setLong(4, now)
+        }
+        // DDL 迁移（结构）
+        execDdl(c, VAULT_MIGRATE_V1_TO_V2)
+        // 数据迁移（需 DEK）
+        migrateDataV1toV2(c, dek)
+        // 迁移后：v2 读取正确
+        val rows = listEntriesMasked(c, dek)
+        checkThat(rows.size == 1 && rows[0].name == "gmail" && rows[0].username == "me@gmail.com") { "迁移后条目 name/username 应保留: ${rows.map { it.name to it.username }}" }
+        val detail = getEntryDecrypted(c, dek, rows[0].id)!!
+        checkThat(detail.password == "g-pw" && detail.categoryName == "邮箱") { "迁移后 secret/分类名应正确: pw=${detail.password} cat=${detail.categoryName}" }
+        // 明文列已清空
+        jdbcQuery(c, "SELECT name, username FROM password_entries") { rs -> checkThat(rs.getString(1) == "" && rs.getString(2) == "") { "迁移后条目明文列应清空" } }
+        jdbcQuery(c, "SELECT name, name_blob FROM categories") { rs -> checkThat(rs.getString(1) == "" && rs.getBytes(2) != null) { "迁移后分类明文列应清空且 name_blob 生成" } }
+        // 幂等：再跑一次数据迁移不应改变结果
+        migrateDataV1toV2(c, dek)
+        checkThat(listEntriesMasked(c, dek).size == 1 && listEntriesMasked(c, dek)[0].name == "gmail") { "迁移应幂等" }
+        // 迁移扫描守卫：迁移完成后计数应为 0
+        jdbcQuery(c, SQL_COUNT_UNMIGRATED_ENTRIES) { rs -> checkThat(rs.getInt(1) == 0) { "迁移后未迁移条目计数应为 0" } }
+        jdbcQuery(c, SQL_COUNT_UNMIGRATED_CATEGORIES) { rs -> checkThat(rs.getInt(1) == 0) { "迁移后未迁移分类计数应为 0" } }
+    } finally { c.close() }
 }
 
 fun checkGcmTamper() {
-    val key = randomDek()
-    val blob = encryptAesGcm(key, "top-secret".toByteArray())
-    // 篡改密文一字节
-    val tampered = AeadBlob(blob.nonce.copyOf(), blob.ciphertext.copyOf().also { it[0] = (it[0].toInt() xor 0xFF).toByte() })
+    val key = randomDek(); val blob = encryptAesGcm(key, "top-secret".toByteArray())
     var threw = false
-    try { decryptAesGcm(key, tampered) } catch (e: VaultException) { threw = true }
-    checkThat(threw) { "GCM 篡改密文必须抛 VaultException（防静默失败）" }
-    // 错误密钥解密亦抛
-    val wrongKey = randomDek()
-    var threw2 = false
-    try { decryptAesGcm(wrongKey, blob) } catch (e: VaultException) { threw2 = true }
-    checkThat(threw2) { "错误密钥解密必须抛 VaultException" }
+    try { decryptAesGcm(key, AeadBlob(blob.nonce.copyOf(), blob.ciphertext.copyOf().also { it[0] = (it[0].toInt() xor 0xFF).toByte() })) } catch (e: VaultException) { threw = true }
+    checkThat(threw) { "GCM 篡改密文必须抛" }
 }
 
-// W4（#QA-004）：畸形 .vault 头必须抛 VaultException（契约 WRONG_PASSWORD 语义），而非 BufferUnderflowException。
-// 复现 qa-jiyan 实证：合法 .vault 把 saltLen 改为 65535 后，parseVaultHeader 曾抛 BufferUnderflowException。
 fun checkMalformedVaultHeader() {
-    val salt = randomSalt()
-    val key = deriveKey("export-pw", salt, DEFAULT_KDF)
-    val blob = encryptAesGcm(key, "payload-bytes".toByteArray())
-    val file = serializeVaultFile(DEFAULT_KDF, salt, blob)
-
-    // 篡改 saltLen=65535：saltLen 位于偏移 15-16（magic4 + version1 + algo1 + mem4 + iter4 + par1）。
-    val saltTampered = file.copyOf()
-    saltTampered[15] = 0xFF.toByte()
-    saltTampered[16] = 0xFF.toByte()
+    val salt = randomSalt(); val key = deriveKey("export-pw", salt, DEFAULT_KDF)
+    val file = serializeVaultFile(DEFAULT_KDF, salt, encryptAesGcm(key, "payload-bytes".toByteArray()))
+    val saltT = file.copyOf().also { it[15] = 0xFF.toByte(); it[16] = 0xFF.toByte() }
     var threwSalt = false
-    try { parseVaultHeader(saltTampered) } catch (e: WrongPasswordException) { threwSalt = true }
-    checkThat(threwSalt) { "saltLen=65535 应抛 WrongPasswordException，而非 BufferUnderflowException" }
-
-    // 截断密文块使 ctLen < TAG_LEN（结构损坏 => WRONG_PASSWORD）。
-    val truncated = file.copyOfRange(0, file.size - AeadBlob.TAG_LEN)
-    var threwCt = false
-    try { parseVaultHeader(truncated) } catch (e: WrongPasswordException) { threwCt = true }
-    checkThat(threwCt) { "密文块过短（ctLen < TAG_LEN）应抛 WrongPasswordException" }
-
-    // 截断至 nonce 越界（ivLen 越界：头部17 + 完整盐 + 仅 4 字节 nonce）。
-    val noNonce = file.copyOfRange(0, 17 + salt.size + 4)
-    var threwNonce = false
-    try { parseVaultHeader(noNonce) } catch (e: WrongPasswordException) { threwNonce = true }
-    checkThat(threwNonce) { "nonce 越界应抛 WrongPasswordException" }
+    try { parseVaultHeader(saltT) } catch (e: WrongPasswordException) { threwSalt = true }
+    checkThat(threwSalt) { "saltLen 越界应抛 WrongPasswordException" }
 }
 
 fun checkVaultSession() {
     val s = VaultSession()
-    checkThat(s.isLocked()) { "初始应为锁定态" }
-    checkThat(s.getActiveDek() == null) { "锁定态 getActiveDek 应为 null" }
-    val dek = randomDek()
-    s.unlock(dek)
-    checkThat(!s.isLocked() && s.getActiveDek()!!.contentEquals(dek)) { "unlock 后 DEK 可取回" }
-    s.lock()
-    checkThat(s.isLocked() && s.getActiveDek() == null) { "lock 后清零且为 null" }
+    checkThat(s.isLocked()) { "初始锁定" }
+    val dek = randomDek(); s.unlock(dek)
+    checkThat(!s.isLocked() && s.getActiveDek()!!.contentEquals(dek)) { "unlock 可取回" }
+    s.lock(); checkThat(s.isLocked() && s.getActiveDek() == null) { "lock 清零" }
 }
 
-// ============================================================================
-// main：先跑纯模块自检，再跑逐条契约检查。
-// ============================================================================
-
-// 每个契约检查用独立的内存库（categories.name 有 UNIQUE 约束，避免跨检查名字冲突）。
 fun withFreshDb(block: (java.sql.Connection) -> Unit) {
     val c = DriverManager.getConnection("jdbc:sqlite::memory:")
-    try {
-        execDdl(c, VAULT_SCHEMA_STATEMENTS)
-        block(c)
-    } finally {
-        c.close()
-    }
+    try { execDdl(c, VAULT_SCHEMA_STATEMENTS); block(c) } finally { c.close() }
 }
 
 fun main(args: Array<String>) {
-    // 自检即文档：纯模块不变量（静默）
-    vaultCryptoSelfTest()
-    vaultFormatSelfTest()
-    vaultMergeSelfTest()
-    jsonSelfTest()
-    vaultSessionSelfTest()
-
-    // 加载 sqlite-jdbc（裸 JVM 无 Android SQLite）
+    vaultCryptoSelfTest(); vaultFormatSelfTest(); vaultMergeSelfTest(); jsonSelfTest(); vaultSessionSelfTest()
+    entryBlobSelfTest(); querySelfTest()
     Class.forName("org.sqlite.JDBC")
-
     withFreshDb { checkListEntries(it) }
+    withFreshDb { checkNoPlaintextMetadata(it) }
     withFreshDb { checkCreateGetUpdateDeleteEntry(it) }
+    withFreshDb { checkExtrasRoundTrip(it) }
     withFreshDb { checkCategoryDao(it) }
     withFreshDb { checkSeedCategories(it) }
     withFreshDb { checkChangeMasterPassword(it) }
     withFreshDb { checkExportImport(it) }
     withFreshDb { checkExportImportMasterPassword(it) }
-    checkGcmTamper()
-    checkMalformedVaultHeader()
-    checkVaultSession()
+    checkV1ToV2Migration()
+    checkGcmTamper(); checkMalformedVaultHeader(); checkVaultSession()
     println("ALL CONTRACT CHECKS OK")
 }

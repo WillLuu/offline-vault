@@ -16,7 +16,7 @@ class DesktopVault(dbFile: File = DesktopDb.defaultVaultFile()) : AutoCloseable 
     val db: DesktopDb = DesktopDb.open(dbFile)
     val unlock: DesktopUnlockManager = DesktopUnlockManager(db)
     private val entryDao = DesktopEntryDao(db.connection) { unlock.getActiveDek() }
-    private val categoryDao = DesktopCategoryDao(db.connection)
+    private val categoryDao = DesktopCategoryDao(db.connection) { unlock.getActiveDek() }
     val settings: DesktopSettingsStore = DesktopSettingsStore(db.connection)
     private val backup = DesktopBackup(db.connection, { unlock.getActiveDek() }, settings)
 

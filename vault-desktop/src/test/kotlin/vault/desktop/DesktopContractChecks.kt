@@ -2,6 +2,7 @@ package vault.desktop
 
 import java.io.File
 import java.nio.file.Files
+import java.sql.DriverManager
 import vault.EntryInput
 import vault.ExtraField
 import vault.LockedException
@@ -11,6 +12,16 @@ import vault.AeadBlob
 import vault.decryptAesGcm
 import vault.parseVaultHeader
 import vault.WrongPasswordException
+import vault.DEFAULT_KDF
+import vault.deriveKey
+import vault.encryptAesGcm
+import vault.jsonEncode
+import vault.makeVerifier
+import vault.randomDek
+import vault.randomSalt
+import vault.wrapKey
+import vault.nowMillis
+import vault.zeroBytes
 
 // ============================================================================
 // DesktopContractChecks：桌面端存储/解锁自检（"自检即文档"约定，无测试框架，静默通过）。
@@ -176,5 +187,60 @@ fun main() {
 
     vault.close()
     tmpDir.deleteRecursively()
-    println("DESKTOP CHECKS OK (9 groups)")
+    checkRealV1ToV2Migration()
+    println("DESKTOP CHECKS OK (10 groups)")
+}
+
+// ⑩ 真实代码路径的 v1→v2 迁移回归：手工建 v1 库（明文 name/username + v1 secret JSON +
+//   明文分类名 + user_version=1），经 DesktopVault.open 触发 DDL 迁移、unlockWithPassword 触发
+//   数据迁移，验证条目/分类名解密可读、明文列清空、重名唯一性生效。
+private fun checkRealV1ToV2Migration() {
+    val tmp = Files.createTempDirectory("ov-mig").toFile()
+    val f = File(tmp, "v1.db")
+    val pw = "migrate-pw-123"
+    val salt = randomSalt()
+    val kek = deriveKey(pw, salt, DEFAULT_KDF)
+    val dek = randomDek()
+    DriverManager.getConnection("jdbc:sqlite:${f.absolutePath}").use { c ->
+        c.createStatement().use { st ->
+            st.execute("CREATE TABLE categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)")
+            st.execute("CREATE UNIQUE INDEX uq_categories_name ON categories(name)")
+            st.execute("CREATE TABLE password_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, username TEXT NOT NULL DEFAULT '', secret_blob BLOB NOT NULL, category_id INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, is_deleted INTEGER NOT NULL DEFAULT 0)")
+            st.execute("CREATE INDEX idx_entries_name ON password_entries(name)")
+            st.execute("CREATE TABLE app_settings (id INTEGER PRIMARY KEY CHECK (id = 1), initialized INTEGER NOT NULL DEFAULT 0, kdf_algo TEXT NOT NULL DEFAULT 'argon2id', kdf_memory_kb INTEGER NOT NULL DEFAULT 32768, kdf_iterations INTEGER NOT NULL DEFAULT 2, kdf_parallelism INTEGER NOT NULL DEFAULT 1, kdf_salt BLOB NOT NULL, wrapped_dek BLOB NOT NULL, verifier BLOB NOT NULL, wrapped_dek_biometric BLOB, auto_lock_timeout_sec INTEGER NOT NULL DEFAULT 60, clipboard_clear_delay_sec INTEGER NOT NULL DEFAULT 30, theme TEXT NOT NULL DEFAULT 'system', biometric_enabled INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)")
+            val now = nowMillis()
+            c.prepareStatement("INSERT INTO categories (name, sort_order, created_at) VALUES ('支付', 0, ?)").use { ps -> ps.setLong(1, now); ps.executeUpdate() }
+            c.prepareStatement("INSERT INTO categories (name, sort_order, created_at) VALUES ('社交', 1, ?)").use { ps -> ps.setLong(1, now); ps.executeUpdate() }
+            // 一条 v1 条目（明文 name/username + v1 secret JSON）
+            val v1Secret = encryptAesGcm(dek, jsonEncode(mapOf("password" to "old-pw", "website" to "https://x", "notes" to "老备注")).toByteArray(Charsets.UTF_8)).toBytes()
+            c.prepareStatement("INSERT INTO password_entries (name, username, secret_blob, category_id, created_at, updated_at, is_deleted) VALUES ('旧条目', 'old-user', ?, 1, ?, ?, 0)").use { ps ->
+                ps.setBytes(1, v1Secret); ps.setLong(2, now); ps.setLong(3, now); ps.executeUpdate()
+            }
+            // app_settings：初始化态（同源 KEK 包 DEK + verifier）
+            c.prepareStatement("INSERT INTO app_settings (id, initialized, kdf_salt, wrapped_dek, verifier, created_at, updated_at) VALUES (1, 1, ?, ?, ?, ?, ?)").use { ps ->
+                ps.setBytes(1, salt); ps.setBytes(2, wrapKey(kek, dek).toBytes()); ps.setBytes(3, makeVerifier(kek).toBytes()); ps.setLong(4, now); ps.setLong(5, now); ps.executeUpdate()
+            }
+            st.execute("PRAGMA user_version = 1")
+        }
+    }
+    zeroBytes(kek)
+
+    // 用新代码打开（触发 DDL 迁移）→ 解锁（触发数据迁移）
+    val vault = DesktopVault(f)
+    checkThat(vault.unlockWithPassword(pw)) { "迁移：正确密码应解锁成功" }
+    // 分类名解密可读且有序
+    checkThat(vault.listCategories().map { it.name } == listOf("支付", "社交")) { "迁移后分类名应可读: ${vault.listCategories().map { it.name }}" }
+    // 条目 name/username 从密文还原
+    val listed = vault.listEntries()
+    checkThat(listed.size == 1 && listed[0].name == "旧条目" && listed[0].username == "old-user") { "迁移后条目名/用户名应还原: ${listed.map { it.name to it.username }}" }
+    val detail = vault.getEntry(listed[0].id)!!
+    checkThat(detail.password == "old-pw" && detail.notes == "老备注" && detail.categoryName == "支付") { "迁移后 secret/分类应正确" }
+    // 明文列已清空
+    vault.db.connection.prepareStatement("SELECT name, username FROM password_entries").use { ps ->
+        ps.executeQuery().use { rs -> while (rs.next()) checkThat(rs.getString(1) == "" && rs.getString(2) == "") { "迁移后明文列应清空" } }
+    }
+    // 重名分类唯一性（代码层）：新建同名"支付"应返回 -1
+    checkThat(vault.createCategory("支付", 9) == -1L) { "迁移后重名分类应被拒（代码层唯一性）" }
+    vault.close()
+    tmp.deleteRecursively()
 }

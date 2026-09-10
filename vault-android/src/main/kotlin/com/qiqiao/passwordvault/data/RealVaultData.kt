@@ -70,7 +70,7 @@ class RealVaultData(context: Context) : VaultData {
     // DAO 们。getDek 由 UnlockManager 提供活跃 DEK。
     private val getDek: () -> ByteArray? = { unlock.getActiveDek() }
     private val entryDao by lazy { PasswordEntryDao(db, getDek) }
-    private val categoryDao by lazy { CategoryDao(db) }
+    private val categoryDao by lazy { CategoryDao(db, getDek) }
     private val settingsStore by lazy { AppSettingsStore(db) }
     private val backup by lazy { VaultBackup(db, getDek, settingsStore) }
 

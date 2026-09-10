@@ -23,8 +23,8 @@ class UnlockManager(
     private val biometric: BiometricKeystore? = null
 ) {
     private val settings = AppSettingsStore(db)
-    private val categoryDao = CategoryDao(db)
     private val session = VaultSession()
+    private val categoryDao = CategoryDao(db) { session.getActiveDek() }
 
     // 连续密码错误计数与冷却截止时刻（审查 F2）。
     // ponytail: 计数仅内存态（进程重启即清零），不落盘——刻意避免新增持久化面，也避免
@@ -55,10 +55,9 @@ class UnlockManager(
         val wrapped = wrapKey(kek, dek)
         val verifier = makeVerifier(kek)
         settings.writeInitialization(salt, wrapped, verifier, null)
+        session.unlock(dek) // 先解锁：种子分类名需加密（v2 需 DEK）
         // 首次初始化即写入种子分类（契约 §3.2：支付/社交/工作/娱乐/邮箱/其他，"其他"不可删）。
-        // 此前遗漏此调用，导致真机首次安装后 categories 为空（契约不一致，已修）。
         categoryDao.seedDefaultsIfEmpty()
-        session.unlock(dek)
         zeroBytes(kek) // KEK 不落盘，用毕清零
         return true
     }
@@ -83,6 +82,7 @@ class UnlockManager(
         }
         val dek = settings.unwrapDek(kek)
         session.unlock(dek)
+        migrateVaultDataIfNeeded(db, dek) // v1→v2 数据迁移（幂等；解锁后需 DEK）
         if (!settings.usesDefaultKdf()) {
             settings.getKdfMaterial()?.second?.let { salt ->
                 val kekNew = deriveKey(password, salt, DEFAULT_KDF)
@@ -133,6 +133,7 @@ class UnlockManager(
         val wrapped = settings.getBiometricWrapped() ?: throw BiometricUnavailableException()
         val dek = bio.unwrapDekWith(cipher, wrapped)
         session.unlock(dek)
+        migrateVaultDataIfNeeded(db, dek) // v1→v2 数据迁移（幂等；生物识别解锁后同样需迁移）
         return true
     }
 
