@@ -42,7 +42,7 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             modules("java.sql", "jdk.unsupported", "java.management") // sqlite-jdbc 需 java.sql；BC/jna 相关需 jdk.unsupported
             packageName = "offline-vault"
-            packageVersion = "1.0.1"
+            packageVersion = "1.1.0"
             vendor = "Will (17deg)"
             description = "Offline Vault - pure offline password manager (desktop)"
             // 注意：MSI/EXE 安装包需本机安装 WiX 3.x；createDistributable（自包含目录）无需
