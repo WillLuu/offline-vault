@@ -48,6 +48,8 @@ compose.desktop {
             // 注意：MSI/EXE 安装包需本机安装 WiX 3.x；createDistributable（自包含目录）无需
             windows {
                 dirChooser = true
+                // exe 文件图标 = 指纹 logo（与移动端启动图标同源，见 resources/icons/）
+                iconFile = project.file("src/main/resources/icons/app.ico")
             }
         }
     }

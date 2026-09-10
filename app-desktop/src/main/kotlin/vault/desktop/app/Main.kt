@@ -18,8 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.useResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,6 +55,14 @@ fun main() {
 
     application {
         val ws = rememberWindowState(width = 1120.dp, height = 740.dp)
+        // 窗口/任务栏图标：与移动端启动图标同源的渐变浮雕指纹（从 classpath 资源载入 PNG）
+        val windowIcon = remember {
+            BitmapPainter(
+                useResource<java.awt.image.BufferedImage>("icons/icon-64.png") { stream ->
+                    javax.imageio.ImageIO.read(stream)
+                }.toComposeImageBitmap()
+            )
+        }
         val onExit = {
             DesktopClipboard.flushNow()
             model.stop()
@@ -63,6 +74,7 @@ fun main() {
             state = ws,
             undecorated = true,
             resizable = true,
+            icon = windowIcon,
         ) {
             NeuTheme(model.themeMode) {
                 Column(Modifier.fillMaxSize().background(LocalNeu.current.bg)) {

@@ -157,6 +157,36 @@ class AppModel(private val vault: DesktopVault) {
     fun setSort(key: SortKey) { sortBy = key; refreshData() }
     fun filterByCategory(id: Long?) { categoryFilter = id; refreshData() }
 
+    // ---- 分类管理（增删改 + 上下重排；vault 同步阻塞，落 scope 离 EDT）----
+    fun createCategory(name: String) {
+        val n = name.trim()
+        if (n.isEmpty()) { note("分类名不能为空"); return }
+        scope.launch {
+            if (vault.createCategory(n, categories.size) < 0) note("已存在同名分类") else refreshData()
+        }
+    }
+    fun renameCategory(id: Long, name: String) {
+        val n = name.trim()
+        if (n.isEmpty()) { note("分类名不能为空"); return }
+        scope.launch {
+            if (!vault.updateCategory(id, name = n)) note("重命名失败（同名或不存在）") else refreshData()
+        }
+    }
+    fun deleteCategory(id: Long) {
+        scope.launch {
+            if (!vault.deleteCategory(id)) note("该分类不可删除（非空或为「其他」）")
+            else { if (categoryFilter == id) categoryFilter = null; refreshData() }
+        }
+    }
+    fun moveCategory(id: Long, up: Boolean) {
+        val list = categories.toMutableList()
+        val i = list.indexOfFirst { it.id == id }
+        val j = if (up) i - 1 else i + 1
+        if (i < 0 || j < 0 || j >= list.size) return
+        val t = list[i]; list[i] = list[j]; list[j] = t
+        scope.launch { vault.reorderCategories(list.map { it.id }); refreshData() }
+    }
+
     fun select(id: Long) {
         selectedId = id
         scope.launch { selectedDetail = vault.getEntry(id) }
@@ -402,6 +432,7 @@ fun MainScreen(model: AppModel) {
     var showEdit by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<PasswordEntryRow?>(null) }
     var showDelete by remember { mutableStateOf(false) }
+    var showCatManage by remember { mutableStateOf(false) }
     val neu = LocalNeu.current
 
     Row(Modifier.fillMaxSize()) {
@@ -434,6 +465,8 @@ fun MainScreen(model: AppModel) {
                     model.filterByCategory(c.id)
                 }
             }
+            Spacer(Modifier.height(6.dp))
+            NeuTextButton("🗂  分类管理", modifier = Modifier.fillMaxWidth()) { showCatManage = true }
 
             Spacer(Modifier.weight(1f))
             PrimaryButton("＋ 新增条目", modifier = Modifier.fillMaxWidth()) {
@@ -499,6 +532,7 @@ fun MainScreen(model: AppModel) {
 
     if (showEdit) EditDialog(model, editTarget) { showEdit = false }
     if (showSettings) SettingsDialog(model) { showSettings = false }
+    if (showCatManage) CategoryManageDialog(model) { showCatManage = false }
     if (showDelete) {
         val name = model.selectedDetail?.name ?: ""
         NeuDialogShell(width = 420.dp) {
@@ -960,6 +994,76 @@ private fun ImportDialog(model: AppModel, onDone: (String?) -> Unit) {
                 if (src == null) { onDone(null); return@NeuButton }
                 model.importBackup(src.absolutePath, filePw) { onDone(it) }
             }
+        }
+    }
+}
+
+// ---------------- 分类管理弹窗（增删改 + 上下重排；对齐移动端 CategoryManageActivity 功能面） ----------------
+
+@Composable
+fun CategoryManageDialog(model: AppModel, onDismiss: () -> Unit) {
+    val neu = LocalNeu.current
+    var newCat by remember { mutableStateOf("") }
+    var editingId by remember { mutableStateOf<Long?>(null) }
+    var editName by remember { mutableStateOf("") }
+
+    NeuDialogShell(width = 480.dp, onDismiss = onDismiss) {
+        Text("分类管理", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(4.dp))
+        Text("用 ↑ ↓ 调整顺序；「其他」为种子分类不可删除；非空分类需先移空再删。",
+            fontSize = 12.sp, color = neu.onSurfaceVariant)
+        Spacer(Modifier.height(14.dp))
+
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            model.categories.forEach { c ->
+                val editing = editingId == c.id
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    NeuIconButton(onClick = { model.moveCategory(c.id, true) }, sizeDp = 32.dp) {
+                        Text("↑", fontSize = 14.sp, color = neu.onSurface)
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    NeuIconButton(onClick = { model.moveCategory(c.id, false) }, sizeDp = 32.dp) {
+                        Text("↓", fontSize = 14.sp, color = neu.onSurface)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    if (editing) {
+                        NeuField(editName, { editName = it }, hint = "分类名称", modifier = Modifier.weight(1f), onEnter = {
+                            model.renameCategory(c.id, editName); editingId = null
+                        })
+                        Spacer(Modifier.width(8.dp))
+                        NeuButton("保存", contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
+                            model.renameCategory(c.id, editName); editingId = null
+                        }
+                    } else {
+                        Column(Modifier.weight(1f)) {
+                            Text(c.name, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = neu.onSurface)
+                            Text("${c.entryCount} 条", fontSize = 11.sp, color = neu.onSurfaceVariant)
+                        }
+                        NeuTextButton("重命名") { editingId = c.id; editName = c.name }
+                        Spacer(Modifier.width(6.dp))
+                        NeuTextButton("删除") { model.deleteCategory(c.id) }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NeuField(newCat, { newCat = it }, hint = "新分类名称", modifier = Modifier.weight(1f),
+                onEnter = { model.createCategory(newCat); newCat = "" })
+            Spacer(Modifier.width(10.dp))
+            NeuButton("＋ 添加", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+                model.createCategory(newCat); newCat = ""
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("关闭") { onDismiss() }
         }
     }
 }
