@@ -17,9 +17,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -336,9 +339,11 @@ fun NeuTextButton(text: String, modifier: Modifier = Modifier, onClick: () -> Un
 @Composable
 fun NeuDialogShell(
     width: Dp,
+    title: String? = null,
     onDismiss: () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val neu = LocalNeu.current
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
@@ -359,15 +364,30 @@ fun NeuDialogShell(
             ) {
                 Column(
                     // 吞掉面板内点击、防止穿透到遮罩关闭弹窗；
-                    // indication = null：默认涟漪/悬浮高亮层会覆盖整个内容区，
-                    // 鼠标悬浮时显现一块"大方框"边缘（此前弹窗观感问题的真凶）
+                    // indication = null：默认涟漪/悬浮高亮层会覆盖整个内容区
                     modifier = Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = {}
-                    ),
-                    content = content
-                )
+                    )
+                ) {
+                    if (title != null) {
+                        // 固定头部：标题左、右上角 × 关闭（统一交互，内容在其下方）
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                                color = neu.onSurface, modifier = Modifier.weight(1f))
+                            NeuIconButton(onClick = onDismiss, sizeDp = 32.dp) {
+                                Text("×", fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                                    color = neu.onSurfaceVariant)
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    content()
+                }
             }
         }
     }

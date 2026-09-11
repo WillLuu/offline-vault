@@ -605,15 +605,11 @@ fun MainScreen(model: AppModel) {
     if (showStats) StatisticsDialog(model) { showStats = false }
     if (showDelete) {
         val name = model.selectedDetail?.name ?: ""
-        NeuDialogShell(width = 420.dp) {
-            Text("删除条目", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-            Spacer(Modifier.height(12.dp))
+        NeuDialogShell(width = 420.dp, title = "删除条目", onDismiss = { showDelete = false }) {
             Text("删除「$name」？（软删除，可由含该条目的备份重新导入恢复）",
                 color = neu.onSurface, fontSize = 14.sp)
             Spacer(Modifier.height(20.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                NeuTextButton("取消") { showDelete = false }
-                Spacer(Modifier.width(8.dp))
                 NeuButton("删除", danger = true) {
                     model.selectedDetail?.let { e -> model.deleteEntry(e.id) { showDelete = false } }
                 }
@@ -658,9 +654,7 @@ private fun AvatarBadge(model: AppModel) {
 private fun StatisticsDialog(model: AppModel, onDismiss: () -> Unit) {
     val neu = LocalNeu.current
     val uncategorized = (model.totalActive - model.categories.sumOf { it.entryCount }).coerceAtLeast(0)
-    NeuDialogShell(width = 440.dp, onDismiss = onDismiss) {
-        Text("数据统计", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(16.dp))
+    NeuDialogShell(width = 440.dp, title = "数据统计", onDismiss = onDismiss) {
         StatRow("条目总数", model.totalActive, neu)
         StatRow("分类数量", model.categories.size, neu)
         StatRow("未分类条目", uncategorized, neu)
@@ -672,10 +666,6 @@ private fun StatisticsDialog(model: AppModel, onDismiss: () -> Unit) {
         Column(Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
             model.categories.forEach { StatRow(it.name, it.entryCount, neu) }
             if (model.categories.isEmpty()) Text("暂无分类", fontSize = 13.sp, color = neu.onSurfaceVariant)
-        }
-        Spacer(Modifier.height(18.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("关闭") { onDismiss() }
         }
     }
 }
@@ -918,10 +908,7 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
     // 行序：备注永远排最后（对齐移动端 rowOrder）。
     val orderedLabels = template.filter { it != "备注" } + template.filter { it == "备注" }
 
-    NeuDialogShell(width = 540.dp) {
-        Text(if (initial == null) "新增条目" else "编辑条目",
-            fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(16.dp))
+    NeuDialogShell(width = 540.dp, title = if (initial == null) "新增条目" else "编辑条目") {
         NeuField(name, { name = it }, hint = "平台 *", modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(12.dp))
         NeuField(username, { username = it }, hint = "账号", modifier = Modifier.fillMaxWidth())
@@ -1010,8 +997,6 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
         }
         Spacer(Modifier.height(20.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("取消") { onDismiss() }
-            Spacer(Modifier.width(10.dp))
             PrimaryButton("保存", modifier = Modifier.width(120.dp),
                 enabled = name.isNotBlank()) {
                 // 仅保留非空 label+value 的自定义词条进加密 extras（网站/备注走独立列）
@@ -1077,9 +1062,7 @@ fun BatchImportDialog(model: AppModel, onDismiss: () -> Unit) {
         parsed = parsed.toMutableList().also { it[i] = transform(it[i]) }
     }
 
-    NeuDialogShell(width = 640.dp, onDismiss = onDismiss) {
-        Text("批量录入", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(4.dp))
+    NeuDialogShell(width = 640.dp, title = "批量录入", onDismiss = onDismiss) {
         Text("粘贴账号笔记（每条以空行分隔，支持 平台/账号/密码/网站/分类/备注 等中英文标签，: ： = 分隔）→ 解析 → 校对 → 导入。",
             fontSize = 12.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(12.dp))
@@ -1138,8 +1121,6 @@ fun BatchImportDialog(model: AppModel, onDismiss: () -> Unit) {
 
         Spacer(Modifier.height(18.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("取消") { onDismiss() }
-            Spacer(Modifier.width(10.dp))
             PrimaryButton(
                 text = if (importing) "导入中…" else "导入 ${parsed.count { it.include }} 条",
                 modifier = Modifier.width(160.dp),
@@ -1171,23 +1152,10 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     var showBatch by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
 
-    NeuDialogShell(width = 540.dp) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
-                    modifier = Modifier.weight(1f))
-                // 右上角 × 关闭（符合点击习惯，且始终可见，不受内容滚动影响）
-                NeuIconButton(onClick = onDismiss, sizeDp = 32.dp) {
-                    Text("×", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurfaceVariant)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Column(
-                modifier = Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())
-            ) {
+    NeuDialogShell(width = 540.dp, title = "设置", onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState())
+        ) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1292,7 +1260,6 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text(it, fontSize = 13.sp, color = neu.onSurfaceVariant)
             }
-            }
         }
     }
 
@@ -1317,9 +1284,7 @@ private fun AboutRow(label: String, value: String) {
 @Composable
 private fun AboutDialog(onDismiss: () -> Unit) {
     val neu = LocalNeu.current
-    NeuDialogShell(width = 560.dp, onDismiss = onDismiss) {
-        Text("关于离线密码本", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(6.dp))
+    NeuDialogShell(width = 560.dp, title = "关于离线密码本", onDismiss = onDismiss) {
         Text("纯离线密码管理器 · Android + Windows 桌面双端 · 数据本地加密存储，无网络、无账号、无云同步。",
             fontSize = 13.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
@@ -1335,10 +1300,6 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState())
         ) {
             Text(ABOUT_DISCLAIMER, fontSize = 12.sp, color = neu.onSurface, lineHeight = 18.sp)
-        }
-        Spacer(Modifier.height(18.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("关闭") { onDismiss() }
         }
     }
 }
@@ -1362,9 +1323,7 @@ private fun ChangePwDialog(model: AppModel, onDone: (String?) -> Unit) {
     var old by remember { mutableStateOf("") }
     var n1 by remember { mutableStateOf("") }
     var n2 by remember { mutableStateOf("") }
-    NeuDialogShell(width = 460.dp) {
-        Text("修改主密码", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(14.dp))
+    NeuDialogShell(width = 460.dp, title = "修改主密码", onDismiss = { onDone(null) }) {
         NeuField(old, { old = it }, hint = "旧主密码", isPassword = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
         NeuField(n1, { n1 = it }, hint = "新主密码（≥8 位）", isPassword = true, modifier = Modifier.fillMaxWidth())
@@ -1372,8 +1331,6 @@ private fun ChangePwDialog(model: AppModel, onDone: (String?) -> Unit) {
         NeuField(n2, { n2 = it }, hint = "确认新主密码", isPassword = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(20.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("取消") { onDone(null) }
-            Spacer(Modifier.width(10.dp))
             NeuButton("修改", enabled = old.isNotBlank() && n1.isNotBlank() && n2.isNotBlank()) {
                 model.changeMaster(old, n1, n2) { onDone(it) }
             }
@@ -1388,9 +1345,7 @@ private fun ExportDialog(model: AppModel, onDone: (String?) -> Unit) {
     var master by remember { mutableStateOf("") }
     var exportPw by remember { mutableStateOf("") }
 
-    NeuDialogShell(width = 480.dp) {
-        Text("导出加密备份（.vault）", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(14.dp))
+    NeuDialogShell(width = 480.dp, title = "导出加密备份（.vault）", onDismiss = { onDone(null) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             NeuTextButton(if (same) "● 主密码同源" else "○ 主密码同源") { same = true }
             NeuTextButton(if (!same) "● 独立导出密码" else "○ 独立导出密码") { same = false }
@@ -1412,8 +1367,6 @@ private fun ExportDialog(model: AppModel, onDone: (String?) -> Unit) {
         )
         Spacer(Modifier.height(18.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("取消") { onDone(null) }
-            Spacer(Modifier.width(10.dp))
             NeuButton("选择位置并导出") {
                 val filePw = if (same) master else exportPw
                 if (filePw.isBlank()) { onDone("请输入密码"); return@NeuButton }
@@ -1430,9 +1383,7 @@ private fun ExportDialog(model: AppModel, onDone: (String?) -> Unit) {
 private fun ImportDialog(model: AppModel, onDone: (String?) -> Unit) {
     val neu = LocalNeu.current
     var filePw by remember { mutableStateOf("") }
-    NeuDialogShell(width = 480.dp) {
-        Text("导入加密备份（.vault）", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(14.dp))
+    NeuDialogShell(width = 480.dp, title = "导入加密备份（.vault）", onDismiss = { onDone(null) }) {
         Text("按（名称+账号+分类）合并、更新时间取新。删除不会传播，导入≠同步。",
             fontSize = 12.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(12.dp))
@@ -1440,8 +1391,6 @@ private fun ImportDialog(model: AppModel, onDone: (String?) -> Unit) {
             modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(18.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("取消") { onDone(null) }
-            Spacer(Modifier.width(10.dp))
             NeuButton("选择文件并导入") {
                 val src = awtOpenDialog(null, "选择 .vault 备份文件")
                 if (src == null) { onDone(null); return@NeuButton }
@@ -1460,9 +1409,7 @@ fun CategoryManageDialog(model: AppModel, onDismiss: () -> Unit) {
     var editingId by remember { mutableStateOf<Long?>(null) }
     var editName by remember { mutableStateOf("") }
 
-    NeuDialogShell(width = 480.dp, onDismiss = onDismiss) {
-        Text("分类管理", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-        Spacer(Modifier.height(4.dp))
+    NeuDialogShell(width = 480.dp, title = "分类管理", onDismiss = onDismiss) {
         Text("用 ↑ ↓ 调整顺序；「其他」为种子分类不可删除；非空分类需先移空再删。",
             fontSize = 12.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(14.dp))
@@ -1513,10 +1460,6 @@ fun CategoryManageDialog(model: AppModel, onDismiss: () -> Unit) {
             NeuButton("添加", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
                 model.createCategory(newCat); newCat = ""
             }
-        }
-        Spacer(Modifier.height(18.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NeuTextButton("关闭") { onDismiss() }
         }
     }
 }
