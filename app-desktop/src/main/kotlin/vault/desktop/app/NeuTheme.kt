@@ -35,10 +35,10 @@ data class NeuColors(
     val isDark: Boolean         // 深色底（面板描边等细节跟随应用内主题，而非系统暗色）
 )
 
-/** 手机端浅色新拟态：冷紫灰底 + 柔和玻璃白卡 + 品牌紫（与手机端逐 token 对齐） */
+/** 手机端浅色新拟态：冷紫灰底 + 白卡 + 品牌紫（与手机端逐 token 对齐） */
 val LightNeu = NeuColors(
     bg = Color(0xFFE0E5EC),
-    surface = Color(0xFFF8F9FB),   // 手机端 glass_card(白 .78) 叠 #E0E5EC 的等效色，替代刺眼纯白
+    surface = Color.White,          // 白卡浮于浅灰底，对比清晰（#F8F9FB 与底色太接近会糊成一片）
     sidebar = Color(0xFFD8DEE8),
     onSurface = Color(0xFF3A4A6B),
     onSurfaceVariant = Color(0xFF7A86A0),
