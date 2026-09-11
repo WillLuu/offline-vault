@@ -477,16 +477,27 @@ fun MainScreen(model: AppModel) {
                 .padding(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 22.dp)) {
+                // brand-mark：凸起指纹徽章（对齐移动端 46dp 锁徽标）
                 NeuSurface(cornerRadius = 12.dp,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)) {
                     androidx.compose.material3.Icon(
                         imageVector = fingerprintVector(neu.primary),
                         contentDescription = "秘匣",
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 Spacer(Modifier.width(10.dp))
-                Text("秘匣", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+                Column(Modifier.weight(1f)) {
+                    Text("秘匣 · 密码保险库", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+                    Text("NEUMORPHISM VAULT", fontSize = 9.sp, letterSpacing = 1.5.sp,
+                        color = neu.onSurfaceVariant)
+                }
+                // avatar 位：凸起圆 17°（对齐移动端 44dp 头像）
+                NeuSurface(cornerRadius = 18.dp, contentPadding = PaddingValues(0.dp)) {
+                    Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                        Text("17°", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = neu.primary)
+                    }
+                }
             }
 
             // 导航区：独立滚动，分类再多也不会把底部三键挤下去（底部位置固定）
