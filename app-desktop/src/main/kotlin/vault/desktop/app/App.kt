@@ -1261,12 +1261,13 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
             Text("关于", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
             Spacer(Modifier.height(8.dp))
             AboutRow("版本", "v1.1.0（桌面版）")
-            AboutRow("开发者", "17° by 拾柒")
+            AboutRow("品牌", "17°")
+            AboutRow("开发者", "Will Joel (L17) / 拾柒")
             AboutRow("开源许可", "MIT License（详见根目录 LICENSE）")
             Spacer(Modifier.height(10.dp))
             NeuTextButton("免责声明与隐私政策…") { showAbout = true }
             Spacer(Modifier.height(10.dp))
-            Text("17° by 拾柒 · 离线密码本 · MIT · 纯离线加密存储",
+            Text("17° · Will Joel (L17) / 拾柒 · MIT · 纯离线加密存储",
                 fontSize = 11.sp, color = neu.onSurfaceVariant)
 
             msg?.let {
@@ -1302,7 +1303,8 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             fontSize = 13.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
         AboutRow("版本", "v1.1.0（桌面版）")
-        AboutRow("开发者", "17° by 拾柒")
+        AboutRow("品牌", "17°")
+        AboutRow("开发者", "Will Joel (L17) / 拾柒")
         AboutRow("开源许可", "MIT License（详见根目录 LICENSE）")
         Spacer(Modifier.height(16.dp))
         Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))

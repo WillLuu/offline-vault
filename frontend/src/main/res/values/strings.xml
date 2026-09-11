@@ -153,12 +153,12 @@
     <string name="settings_batch">批量录入</string>
     <string name="settings_category_manage">分类管理</string>
     <string name="settings_change_master_password">修改主密码</string>
-    <string name="about_footer">17° by 拾柒 · 离线密码本 v1.0 · MIT · 纯离线加密存储</string>
+    <string name="about_footer">17° · Will Joel (L17) / 拾柒 · MIT · 纯离线加密存储</string>
     <string name="about_title">关于离线密码本</string>
     <string name="about_version_label">版本</string>
     <string name="about_developer_label">开发者</string>
     <string name="about_license_label">开源许可</string>
-    <string name="about_developer_value">17° by 拾柒</string>
+    <string name="about_developer_value">Will Joel (L17) / 拾柒</string>
     <string name="about_license_value">MIT License（详见根目录 LICENSE）</string>
     <string name="about_disclaimer_title">免责声明与隐私政策</string>
     <string name="about_disclaimer">【隐私政策】\n1. 纯离线运行：本应用未申请任何网络权限（无 INTERNET 权限，经 APK 二进制核验），技术上不存在把数据发送到任何服务器的通道，绝不联网、绝不上传。\n2. 数据只存本机：全部密码数据经 AES-256-GCM 加密后仅保存在本机应用私有目录的加密数据库中；主密码经 Argon2id 派生密钥，密钥材料不出本机、用毕即清零。\n3. 零采集零追踪：不采集、不分析、不共享任何用户信息；无广告、无统计 SDK、无第三方追踪组件。\n4. 剪贴板：复制密码会写入系统剪贴板，并按设置页的延时自动清除；部分机型可能在其它应用中短暂可见，属系统机制，请留意。\n5. 备份文件：导出的 .vault 备份为加密文件，由您自行选择位置保存与保管；备份文件一旦泄露，强度取决于您设置的导出密码，请勿使用弱密码。\n6. 权限说明：仅使用生物识别（指纹）权限用于本地解锁认证，不用于任何其它目的。\n\n【免责声明】\n本软件是一款纯离线的个人开源密码管理器（MIT 许可）。软件按"原样"提供，作者不对因使用或无法使用本软件造成的任何数据丢失、损坏或泄露承担责任。\n\n请务必牢记主密码——它不落盘、无法找回；未开启指纹解锁且遗忘主密码时，所有数据将永久无法解密。请勿用于生产级敏感凭证管理。</string>

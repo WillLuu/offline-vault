@@ -110,9 +110,8 @@ adb install -r frontend/build/outputs/apk/debug/app-android-debug.apk
 ## 开发者
 
 - 品牌 / 标志：**17°**
-- 作者：**拾柒**（Will）
-- 邮箱：429234059@qq.com
-- 许可：[MIT](./LICENSE)
+- 开发者：**Will Joel (L17) / 拾柒**
+- 许可：**MIT**
 
 ## 已知边界（诚实清单）
 
