@@ -1075,16 +1075,29 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
             Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
             Spacer(Modifier.height(16.dp))
 
-            NeuField(lockSec, { lockSec = it }, hint = "自动锁超时（秒，0=不超时）",
-                modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(10.dp))
-            NeuField(clipSec, { clipSec = it }, hint = "剪贴板清除延时（秒，0=永不）",
-                modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(10.dp))
-            NeuButton("保存安全设置") {
-                val l = lockSec.toIntOrNull(); val c = clipSec.toIntOrNull()
-                if (l == null || c == null || l < 0 || c < 0) msg = "请输入非负整数"
-                else model.saveSettings(l, c) { msg = it }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("自动锁超时（秒，0=不超时）", fontSize = 12.sp, color = neu.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    NeuField(lockSec, { lockSec = it }, hint = "秒",
+                        modifier = Modifier.fillMaxWidth(0.42f))
+                    Spacer(Modifier.height(14.dp))
+                    Text("剪贴板清除延时（秒，0=永不自动清除）", fontSize = 12.sp, color = neu.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    NeuField(clipSec, { clipSec = it }, hint = "秒",
+                        modifier = Modifier.fillMaxWidth(0.42f))
+                }
+                Spacer(Modifier.width(16.dp))
+                // 正方形保存按钮，靠右对齐
+                NeuButton("保存", modifier = Modifier.size(76.dp),
+                    contentPadding = PaddingValues(0.dp)) {
+                    val l = lockSec.toIntOrNull(); val c = clipSec.toIntOrNull()
+                    if (l == null || c == null || l < 0 || c < 0) msg = "请输入非负整数"
+                    else model.saveSettings(l, c) { msg = it }
+                }
             }
 
             Spacer(Modifier.height(18.dp))
