@@ -1069,9 +1069,12 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     var showImport by remember { mutableStateOf(false) }
     var showCatManage by remember { mutableStateOf(false) }
     var showBatch by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     NeuDialogShell(width = 540.dp) {
-        Column {
+        Column(
+            modifier = Modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState())
+        ) {
             Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
             Spacer(Modifier.height(16.dp))
 
@@ -1143,6 +1146,20 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
                 NeuButton("批量录入…") { showBatch = true }
             }
 
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+            Spacer(Modifier.height(14.dp))
+            Text("关于", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+            Spacer(Modifier.height(8.dp))
+            AboutRow("版本", "v1.1.0（桌面版）")
+            AboutRow("开发者", "17° by 拾柒")
+            AboutRow("开源许可", "MIT License（详见根目录 LICENSE）")
+            Spacer(Modifier.height(10.dp))
+            NeuTextButton("免责声明与隐私政策…") { showAbout = true }
+            Spacer(Modifier.height(10.dp))
+            Text("17° by 拾柒 · 离线密码本 · MIT · 纯离线加密存储",
+                fontSize = 11.sp, color = neu.onSurfaceVariant)
+
             msg?.let {
                 Spacer(Modifier.height(12.dp))
                 Text(it, fontSize = 13.sp, color = neu.onSurfaceVariant)
@@ -1159,7 +1176,60 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     if (showImport) ImportDialog(model, onDone = { m -> msg = m; showImport = false })
     if (showCatManage) CategoryManageDialog(model) { showCatManage = false }
     if (showBatch) BatchImportDialog(model) { showBatch = false }
+    if (showAbout) AboutDialog { showAbout = false }
 }
+
+@Composable
+private fun AboutRow(label: String, value: String) {
+    val neu = LocalNeu.current
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(label, fontSize = 13.sp, color = neu.onSurfaceVariant, modifier = Modifier.width(76.dp))
+        Text(value, fontSize = 13.sp, color = neu.onSurface)
+    }
+}
+
+/** 免责声明与隐私政策（与手机端 about_disclaimer 同源全文），可滚动。 */
+@Composable
+private fun AboutDialog(onDismiss: () -> Unit) {
+    val neu = LocalNeu.current
+    NeuDialogShell(width = 560.dp, onDismiss = onDismiss) {
+        Text("关于离线密码本", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Text("纯离线密码管理器 · Android + Windows 桌面双端 · 数据本地加密存储，无网络、无账号、无云同步。",
+            fontSize = 13.sp, color = neu.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        AboutRow("版本", "v1.1.0（桌面版）")
+        AboutRow("开发者", "17° by 拾柒")
+        AboutRow("开源许可", "MIT License（详见根目录 LICENSE）")
+        Spacer(Modifier.height(16.dp))
+        Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+        Spacer(Modifier.height(14.dp))
+        Text("免责声明与隐私政策", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(8.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState())
+        ) {
+            Text(ABOUT_DISCLAIMER, fontSize = 12.sp, color = neu.onSurface, lineHeight = 18.sp)
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("关闭") { onDismiss() }
+        }
+    }
+}
+
+private const val ABOUT_DISCLAIMER = """【隐私政策】
+1. 纯离线运行：本应用未申请任何网络权限（无 INTERNET 权限），技术上不存在把数据发送到任何服务器的通道，绝不联网、绝不上传。
+2. 数据只存本机：全部密码数据经 AES-256-GCM 加密后仅保存在本机应用私有目录的加密数据库中；主密码经 Argon2id 派生密钥，密钥材料不出本机、用毕即清零。
+3. 零采集零追踪：不采集、不分析、不共享任何用户信息；无广告、无统计 SDK、无第三方追踪组件。
+4. 剪贴板：复制密码会写入系统剪贴板，并按设置页的延时自动清除；部分场景可能在其它应用中短暂可见，属系统机制，请留意。
+5. 备份文件：导出的 .vault 备份为加密文件，由您自行选择位置保存与保管；备份文件一旦泄露，强度取决于您设置的导出密码，请勿使用弱密码。
+6. 权限说明：仅使用生物识别（指纹）权限用于本地解锁认证，不用于任何其它目的。
+
+【免责声明】
+本软件是一款纯离线的个人开源密码管理器（MIT 许可）。软件按"原样"提供，作者不对因使用或无法使用本软件造成的任何数据丢失、损坏或泄露承担责任。
+
+请务必牢记主密码——它不落盘、无法找回；未开启指纹解锁且遗忘主密码时，所有数据将永久无法解密。请勿用于生产级敏感凭证管理。"""
 
 @Composable
 private fun ChangePwDialog(model: AppModel, onDone: (String?) -> Unit) {
