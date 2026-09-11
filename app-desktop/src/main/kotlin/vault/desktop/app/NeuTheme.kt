@@ -35,21 +35,21 @@ data class NeuColors(
     val isDark: Boolean         // 深色底（面板描边等细节跟随应用内主题，而非系统暗色）
 )
 
-/** 手机端浅色新拟态：冷紫灰底 + 白卡 + 品牌紫（与手机端逐 token 对齐） */
+/** 手机端浅色：全白底 + 白卡（靠阴影分层）+ 浅灰输入凹槽 + 品牌紫 */
 val LightNeu = NeuColors(
-    bg = Color(0xFFE0E5EC),
-    surface = Color.White,          // 白卡浮于浅灰底，对比清晰（#F8F9FB 与底色太接近会糊成一片）
-    sidebar = Color(0xFFD8DEE8),
+    bg = Color.White,               // 整体白底（背景与卡片同为白，卡片靠投影浮起）
+    surface = Color.White,
+    sidebar = Color(0xFFF4F6FA),    // 侧栏极浅白，与主区微差以保留分区感
     onSurface = Color(0xFF3A4A6B),
     onSurfaceVariant = Color(0xFF7A86A0),
     primary = Color(0xFF5F6FD6),
     onPrimary = Color.White,
     border = Color(0xFFD5D8E2),
-    divider = Color(0xFFCBD2DE),
-    hoverBg = Color(0xFFD6DAE2),
+    divider = Color(0xFFE2E6EE),
+    hoverBg = Color(0xFFEEF1F6),
     error = Color(0xFFEF4444),
     accent = Color(0xFF3FB598),
-    insetBg = Color(0xFFD6DAE2),
+    insetBg = Color(0xFFE0E5EC),    // 输入框浅灰凹槽（比白底暗一档）
     bevelDark = Color(0xFFA3B1C6),
     bevelLight = Color(0xFFFFFFFF),
     isDark = false
