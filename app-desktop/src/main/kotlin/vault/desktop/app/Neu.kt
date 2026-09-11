@@ -343,7 +343,7 @@ fun NeuDialogShell(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.35f))
+                // 无遮罩底色：之前 0.35 黑的矩形遮罩会从圆角面板四角露出，看着像一块色块
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
