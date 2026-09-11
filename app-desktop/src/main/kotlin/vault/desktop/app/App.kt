@@ -921,7 +921,7 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
     // 行序：备注永远排最后（对齐移动端 rowOrder）。
     val orderedLabels = template.filter { it != "备注" } + template.filter { it == "备注" }
 
-    NeuDialogShell(width = 540.dp, title = if (initial == null) "新增条目" else "编辑条目") {
+    NeuDialogShell(width = 540.dp, title = if (initial == null) "新增条目" else "编辑条目", onDismiss = onDismiss) {
         NeuField(name, { name = it }, hint = "平台 *", modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(12.dp))
         NeuField(username, { username = it }, hint = "账号", modifier = Modifier.fillMaxWidth())
