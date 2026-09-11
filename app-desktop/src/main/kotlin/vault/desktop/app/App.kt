@@ -496,7 +496,7 @@ fun MainScreen(model: AppModel) {
             modifier = Modifier
                 .width(230.dp)
                 .fillMaxHeight()
-                .background(neu.sidebar)
+                .background(neu.bg)
                 .padding(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 22.dp)) {
@@ -542,7 +542,7 @@ fun MainScreen(model: AppModel) {
             ) {
                 NeuTextButton("设置", modifier = Modifier.weight(1f)) { showSettings = true }
                 NeuButton("+", modifier = Modifier.width(52.dp),
-                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 11.dp)) {
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp)) {
                     editTarget = null; showEdit = true
                 }
                 NeuTextButton("锁定", modifier = Modifier.weight(1f)) { model.lockNow() }
@@ -706,11 +706,11 @@ private fun NavItem(label: String, count: Int, selected: Boolean, onClick: () ->
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (selected) Modifier.shadow(2.dp, RoundedCornerShape(12.dp)) else Modifier)
+            .then(if (selected) Modifier.shadow(5.dp, RoundedCornerShape(12.dp)) else Modifier)
             .hoverable(iso)
             .clickable(interactionSource = iso, indication = null, onClick = onClick)
             .background(bg, RoundedCornerShape(12.dp))
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
