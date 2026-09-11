@@ -502,7 +502,7 @@ fun MainScreen(model: AppModel) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 22.dp)) {
                 // 左：自定义头像（点击换图；未设置时品牌指纹兜底）
                 AvatarBadge(model)
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(4.dp))
                 Column(Modifier.weight(1f)) {
                     Text("秘匣 · 密码保险库", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
                 }
