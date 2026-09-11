@@ -511,7 +511,7 @@ fun MainScreen(model: AppModel) {
                     modifier = Modifier.clip(CircleShape)
                         .clickable { showStats = true }
                 ) {
-                    NeuSurface(cornerRadius = 18.dp, contentPadding = PaddingValues(0.dp)) {
+                    NeuSurface(cornerRadius = 18.dp, elevation = 6.dp, contentPadding = PaddingValues(0.dp)) {
                         Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                             Text("17°", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = neu.primary)
                         }
@@ -634,14 +634,15 @@ private fun AvatarBadge(model: AppModel) {
         } else null
     }
     Box(
-        modifier = Modifier.size(40.dp).clip(CircleShape).clickable { model.pickAvatar() },
+        modifier = Modifier.shadow(6.dp, CircleShape).size(40.dp).clip(CircleShape)
+            .clickable { model.pickAvatar() },
         contentAlignment = Alignment.Center
     ) {
         if (painter != null) {
             Image(painter, contentDescription = "头像", contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize())
         } else {
-            Box(Modifier.fillMaxSize().background(neu.sidebar), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(neu.surface), contentAlignment = Alignment.Center) {
                 androidx.compose.material3.Icon(fingerprintVector(neu.primary), "头像",
                     modifier = Modifier.size(22.dp))
             }
@@ -798,6 +799,7 @@ private fun RowScope.DetailPane(
             Text(e.name, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
                 modifier = Modifier.weight(1f))
             NeuTextButton("编辑") { onEdit() }
+            Spacer(Modifier.width(10.dp))
             NeuTextButton("删除") { onDelete() }
         }
         Spacer(Modifier.height(4.dp))
@@ -805,16 +807,27 @@ private fun RowScope.DetailPane(
             "${e.categoryName ?: "未分类"} · 更新于 ${formatTime(e.updatedAt)} · 强度 ${strengthLabel(passwordStrength(e.password.orEmpty()))}",
             fontSize = 12.sp, color = neu.onSurfaceVariant
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(14.dp))
 
+        DetailDivider()
         FieldRow("账号", e.username, model)
+        DetailDivider()
         PasswordRow(e.password.orEmpty(), model)
+        DetailDivider()
         FieldRow("网站", e.website.orEmpty(), model)
+        DetailDivider()
         FieldRow("备注", e.notes.orEmpty(), model)
-        e.extras.forEach { f -> FieldRow(f.label, f.value, model) }
-        Spacer(Modifier.height(10.dp))
+        e.extras.forEach { f -> DetailDivider(); FieldRow(f.label, f.value, model) }
+        DetailDivider()
         Text("创建于 ${formatTime(e.createdAt)}", fontSize = 12.sp, color = neu.onSurfaceVariant)
     }
+}
+
+/** 详情各部分之间的细分隔线。 */
+@Composable
+private fun DetailDivider() {
+    val neu = LocalNeu.current
+    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp).background(neu.divider))
 }
 
 @Composable

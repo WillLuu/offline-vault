@@ -317,7 +317,7 @@ fun NeuTextButton(text: String, modifier: Modifier = Modifier, onClick: () -> Un
     val neu = LocalNeu.current
     val iso = remember { MutableInteractionSource() }
     val pressed by iso.collectIsPressedAsState()
-    val shadow = 2.5.dp   // 恒定投影；不做缩放（缩放与投影轮廓不同步会露出外圈）
+    val shadow = 4.dp   // 恒定投影；不做缩放（缩放与投影轮廓不同步会露出外圈）
     val pillShape = RoundedCornerShape(10.dp)
     Box(
         modifier = modifier
