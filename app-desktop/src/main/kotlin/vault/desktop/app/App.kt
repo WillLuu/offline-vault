@@ -1224,31 +1224,43 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
             Spacer(Modifier.height(18.dp))
             Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
             Spacer(Modifier.height(14.dp))
-            Text("修改主密码", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-            Spacer(Modifier.height(8.dp))
-            NeuButton("修改主密码…") { msg = null; showChangePw = true }
-
-            Spacer(Modifier.height(18.dp))
-            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
-            Spacer(Modifier.height(14.dp))
-            Text("备份（与 Android 版 .vault 双向兼容）", fontSize = 15.sp,
-                fontWeight = FontWeight.Bold, color = neu.onSurface)
-            Spacer(Modifier.height(8.dp))
-            Row {
-                NeuButton("导出 .vault…") { msg = null; showExport = true }
-                Spacer(Modifier.width(12.dp))
-                NeuButton("导入 .vault…") { msg = null; showImport = true }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("修改主密码", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
+                    modifier = Modifier.weight(1f))
+                NeuButton("修改主密码…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) {
+                    msg = null; showChangePw = true
+                }
             }
 
             Spacer(Modifier.height(18.dp))
             Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
             Spacer(Modifier.height(14.dp))
-            Text("数据管理", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-            Spacer(Modifier.height(8.dp))
-            Row {
-                NeuButton("分类管理…") { showCatManage = true }
-                Spacer(Modifier.width(12.dp))
-                NeuButton("批量录入…") { showBatch = true }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("备份（双端兼容）", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
+                    modifier = Modifier.weight(1f))
+                NeuButton("导出 .vault…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) { msg = null; showExport = true }
+                Spacer(Modifier.width(10.dp))
+                NeuButton("导入 .vault…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) { msg = null; showImport = true }
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("数据管理", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
+                    modifier = Modifier.weight(1f))
+                NeuButton("分类管理…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) { showCatManage = true }
+                Spacer(Modifier.width(10.dp))
+                NeuButton("批量录入…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) { showBatch = true }
             }
 
             Spacer(Modifier.height(18.dp))
@@ -1324,17 +1336,17 @@ private fun AboutDialog(onDismiss: () -> Unit) {
 }
 
 private const val ABOUT_DISCLAIMER = """【隐私政策】
-1. 纯离线运行：本应用未申请任何网络权限（无 INTERNET 权限），技术上不存在把数据发送到任何服务器的通道，绝不联网、绝不上传。
-2. 数据只存本机：全部密码数据经 AES-256-GCM 加密后仅保存在本机应用私有目录的加密数据库中；主密码经 Argon2id 派生密钥，密钥材料不出本机、用毕即清零。
+1. 纯离线运行：桌面版不含任何网络访问代码，技术上不存在把数据发送到任何服务器的通道，绝不联网、绝不上传。
+2. 数据只存本机：全部密码数据经 AES-256-GCM 加密后仅保存在本机用户目录（%APPDATA%\OfflineVault）的加密数据库中；主密码经 Argon2id 派生密钥，密钥材料不出本机、用毕即清零。
 3. 零采集零追踪：不采集、不分析、不共享任何用户信息；无广告、无统计 SDK、无第三方追踪组件。
-4. 剪贴板：复制密码会写入系统剪贴板，并按设置页的延时自动清除；部分场景可能在其它应用中短暂可见，属系统机制，请留意。
+4. 剪贴板：复制密码会写入系统剪贴板，并按设置页的延时自动清除；若开启了系统剪贴板历史（Win+V），历史中可能短暂留存，属系统机制，建议按需关闭。
 5. 备份文件：导出的 .vault 备份为加密文件，由您自行选择位置保存与保管；备份文件一旦泄露，强度取决于您设置的导出密码，请勿使用弱密码。
-6. 权限说明：仅使用生物识别（指纹）权限用于本地解锁认证，不用于任何其它目的。
+6. 解锁方式：桌面版仅支持主密码解锁，不含生物识别/指纹，也不申请任何系统级敏感权限。
 
 【免责声明】
 本软件是一款纯离线的个人开源密码管理器（MIT 许可）。软件按"原样"提供，作者不对因使用或无法使用本软件造成的任何数据丢失、损坏或泄露承担责任。
 
-请务必牢记主密码——它不落盘、无法找回；未开启指纹解锁且遗忘主密码时，所有数据将永久无法解密。请勿用于生产级敏感凭证管理。"""
+请务必牢记主密码——它不落盘、无法找回；一旦遗忘主密码，所有数据将永久无法解密。请勿用于生产级敏感凭证管理。"""
 
 @Composable
 private fun ChangePwDialog(model: AppModel, onDone: (String?) -> Unit) {
