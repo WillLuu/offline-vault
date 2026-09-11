@@ -505,8 +505,6 @@ fun MainScreen(model: AppModel) {
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("秘匣 · 密码保险库", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-                    Text("NEUMORPHISM VAULT", fontSize = 9.sp, letterSpacing = 1.5.sp,
-                        color = neu.onSurfaceVariant)
                 }
                 // 右：17° logo，点击 → 数据统计
                 Box(
@@ -561,17 +559,17 @@ fun MainScreen(model: AppModel) {
                 .fillMaxHeight()
                 .padding(12.dp)
         ) {
-            NeuField(model.search, { model.onSearchChange(it) },
-                hint = "搜索名称或用户名", modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                NeuField(model.search, { model.onSearchChange(it) },
+                    hint = "搜索名称或用户名", modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
                 SortMenu(model.sortBy) { model.setSort(it) }
-                Text("共 ${model.entries.size} 条", fontSize = 12.sp, color = neu.onSurfaceVariant)
             }
+            Spacer(Modifier.height(10.dp))
+            Text("共 ${model.entries.size} 条", fontSize = 12.sp, color = neu.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             if (model.entries.isEmpty()) {
                 EmptyState(
