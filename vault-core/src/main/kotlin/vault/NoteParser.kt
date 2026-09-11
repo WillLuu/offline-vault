@@ -1,7 +1,8 @@
-package com.qiqiao.passwordvault.ui.import
+package vault
 
 /**
- * 自由文本笔记解析器：把用户粘贴的账号/密码笔记解析为多条 ParsedEntry。
+ * 自由文本笔记解析器（2026-09-11 从 frontend 下沉至 vault-core，Android/桌面共用同一份，零漂移）。
+ * 把用户粘贴的账号/密码笔记解析为多条 ParsedEntry。
  * 支持中英文标签（账号/用户/密码/网站/网址/分类/备注 等）、分隔符 : ： = 及空格。
  * 条目之间以空行分隔；无空行时按「无标签行 / 相同标签重复」切分新条目
  * （同字段不同别名如 账号/邮箱 视为同一条目，重复值保留进备注）。
@@ -56,7 +57,6 @@ object NoteParser {
                     val value = m.groupValues[2].trim()
                     if (value.isEmpty()) continue
                     // 字段已填充时，同字段的后续标签值保留进备注（原实现静默丢弃）。
-                    // 典型场景：同一条目里既写「账号：a」又写「邮箱：b」（两个别名同映射 username）。
                     val filled = when (key) {
                         "name" -> entry.name.isNotEmpty()
                         "username" -> entry.username.isNotEmpty()
@@ -114,10 +114,8 @@ object NoteParser {
         if (byBlank.size > 1) return byBlank.map { it.trim() }.filter { it.isNotEmpty() }
 
         // 无空行：按行分组。切分规则（2026-09-06 修复精化）：
-        //  a) 无标签行：仅当当前块已含字段标签时才开新条——标题后紧跟的裸行（如裸邮箱）归入同条，
-        //     避免「Github / me@x.com / 密码：p」被拆成 [Github] + [me@x.com+密码] 两条；
-        //  b) 相同标签重复（账号…账号）=> 新条目。同字段不同别名（账号/邮箱）不拆，
-        //     重复值由 parse() 保留进备注（原按"字段键重复"切分会把 账号+邮箱 误拆成两条）。
+        //  a) 无标签行：仅当当前块已含字段标签时才开新条；
+        //  b) 相同标签重复（账号…账号）=> 新条目。同字段不同别名（账号/邮箱）不拆。
         val lines = trimmed.lines().map { it.trim() }.filter { it.isNotEmpty() }
         val blocks = mutableListOf<StringBuilder>()
         var cur = StringBuilder()
@@ -125,9 +123,9 @@ object NoteParser {
         for (line in lines) {
             val labels = fieldLabelsInLine(line)
             val startsNew = when {
-                cur.isEmpty() -> false                    // 首行不开新块
-                labels.isEmpty() -> used.isNotEmpty()     // 无标签行：当前块已有字段才切分
-                labels.any { it in used } -> true         // 相同标签重复 => 新条目
+                cur.isEmpty() -> false
+                labels.isEmpty() -> used.isNotEmpty()
+                labels.any { it in used } -> true
                 else -> false
             }
             if (startsNew) {
@@ -140,5 +138,17 @@ object NoteParser {
         }
         if (cur.isNotBlank()) blocks.add(cur)
         return blocks.map { it.toString().trim() }.filter { it.isNotBlank() }
+    }
+
+    // 自检：多标签块、别名去重、无空行按标签重复切分。
+    fun noteParserSelfTest() {
+        val multi = parse("Github\n账号：me@x.com\n密码：p1\n网址：https://gh\n\n微信\n用户：wx\n口令：p2")
+        checkThat(multi.size == 2) { "空行应切成 2 条，实 ${multi.size}" }
+        checkThat(multi[0].name == "Github" && multi[0].username == "me@x.com" && multi[0].password == "p1") { "首条解析错误: ${multi[0]}" }
+        checkThat(multi[1].username == "wx" && multi[1].password == "p2") { "次条解析错误: ${multi[1]}" }
+        // 别名同键（账号 + 邮箱）不拆条，重复值进备注
+        val alias = parse("账号：a@b.c\n邮箱：d@e.f")
+        checkThat(alias.size == 1) { "账号+邮箱同键不应拆条，实 ${alias.size}" }
+        checkThat(alias[0].username == "a@b.c" && alias[0].notes.contains("d@e.f")) { "别名重复值应进备注" }
     }
 }

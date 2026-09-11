@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,6 +50,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import vault.CategoryRow
 import vault.EntryInput
+import vault.ExtraField
 import vault.PasswordEntryRow
 import vault.SettingsPatch
 import vault.SortKey
@@ -185,6 +187,35 @@ class AppModel(private val vault: DesktopVault) {
         if (i < 0 || j < 0 || j >= list.size) return
         val t = list[i]; list[i] = list[j]; list[j] = t
         scope.launch { vault.reorderCategories(list.map { it.id }); refreshData() }
+    }
+
+    // ---- 批量录入：分类按名匹配（缺失则末尾新建），逐条写入；回调 (成功, 失败) ----
+    fun importBatch(entries: List<vault.ParsedEntry>, onDone: (ok: Int, failed: Int) -> Unit) {
+        scope.launch {
+            val cats = vault.listCategories()
+            val catMap = cats.associate { it.name.trim() to it.id }.toMutableMap()
+            var nextSort = (cats.maxOfOrNull { it.sortOrder } ?: -1) + 1
+            var ok = 0; var failed = 0
+            for (e in entries) {
+                if (!e.include) continue
+                if (e.name.isBlank() && e.username.isBlank() && e.password.isBlank() && e.website.isBlank()) continue
+                var catId: Long? = null
+                val ct = e.category.trim()
+                if (ct.isNotEmpty()) {
+                    catId = catMap[ct]
+                    if (catId == null) {
+                        val id = vault.createCategory(ct, nextSort)
+                        if (id > 0) { catMap[ct] = id; nextSort++; catId = id }
+                    }
+                }
+                val id = vault.createEntry(
+                    EntryInput(e.name.trim(), e.username.trim(), e.password, e.website.trim(), e.notes.trim(), catId)
+                )
+                if (id > 0) ok++ else failed++
+            }
+            refreshData()
+            onDone(ok, failed)
+        }
     }
 
     fun select(id: Long) {
@@ -433,6 +464,7 @@ fun MainScreen(model: AppModel) {
     var editTarget by remember { mutableStateOf<PasswordEntryRow?>(null) }
     var showDelete by remember { mutableStateOf(false) }
     var showCatManage by remember { mutableStateOf(false) }
+    var showBatch by remember { mutableStateOf(false) }
     val neu = LocalNeu.current
 
     Row(Modifier.fillMaxSize()) {
@@ -466,7 +498,10 @@ fun MainScreen(model: AppModel) {
                 }
             }
             Spacer(Modifier.height(6.dp))
-            NeuTextButton("🗂  分类管理", modifier = Modifier.fillMaxWidth()) { showCatManage = true }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NeuTextButton("🗂 分类管理", modifier = Modifier.weight(1f)) { showCatManage = true }
+                NeuTextButton("📥 批量录入", modifier = Modifier.weight(1f)) { showBatch = true }
+            }
 
             Spacer(Modifier.weight(1f))
             PrimaryButton("＋ 新增条目", modifier = Modifier.fillMaxWidth()) {
@@ -533,6 +568,7 @@ fun MainScreen(model: AppModel) {
     if (showEdit) EditDialog(model, editTarget) { showEdit = false }
     if (showSettings) SettingsDialog(model) { showSettings = false }
     if (showCatManage) CategoryManageDialog(model) { showCatManage = false }
+    if (showBatch) BatchImportDialog(model) { showBatch = false }
     if (showDelete) {
         val name = model.selectedDetail?.name ?: ""
         NeuDialogShell(width = 420.dp) {
@@ -766,6 +802,28 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
     var catId by remember { mutableStateOf(initial?.categoryId) }
     var showCat by remember { mutableStateOf(false) }
 
+    // 自定义词条值（邮箱 + 自定义；网站/备注走独立列，不在此）。编辑态从条目 extras 载入。
+    val extras = remember { mutableStateListOf<ExtraField>().apply { initial?.extras?.forEach { add(it) } } }
+    // 全局模板（有序），驱动渲染哪些词条行；每次变更即持久化到 DesktopFieldTemplate。
+    val template = remember { mutableStateListOf<String>().apply { addAll(DesktopFieldTemplate.load()) } }
+    var renamingLabel by remember { mutableStateOf<String?>(null) }
+    var renameText by remember { mutableStateOf("") }
+    var showAdd by remember { mutableStateOf(false) }
+    var newLabel by remember { mutableStateOf("") }
+
+    fun persistTemplate() = DesktopFieldTemplate.save(template.toList())
+    fun valueOf(label: String): String = extras.firstOrNull { it.label == label }?.value ?: ""
+    fun setValue(label: String, v: String) {
+        val i = extras.indexOfFirst { it.label == label }
+        when {
+            v.isBlank() -> if (i >= 0) extras.removeAt(i)
+            i >= 0 -> extras[i] = ExtraField(label, v)
+            else -> extras.add(ExtraField(label, v))
+        }
+    }
+    // 行序：备注永远排最后（对齐移动端 rowOrder）。
+    val orderedLabels = template.filter { it != "备注" } + template.filter { it == "备注" }
+
     NeuDialogShell(width = 540.dp) {
         Text(if (initial == null) "新增条目" else "编辑条目",
             fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
@@ -788,11 +846,65 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
         Text("强度：${strengthLabel(passwordStrength(password))}",
             fontSize = 11.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(12.dp))
-        NeuField(website, { website = it }, hint = "网站", modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(12.dp))
-        NeuField(notes, { notes = it }, hint = "备注", singleLine = false, minLines = 3,
-            modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(10.dp))
+        // 模板驱动的词条行：网站/备注映射独立列；其余（邮箱/自定义）为可增删改的 extras 行
+        orderedLabels.forEach { label ->
+            when (label) {
+                "网站" -> {
+                    NeuField(website, { website = it }, hint = "网站", modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(12.dp))
+                }
+                "备注" -> {
+                    NeuField(notes, { notes = it }, hint = "备注", singleLine = false, minLines = 3,
+                        modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(12.dp))
+                }
+                else -> {
+                    ExtraFieldRow(
+                        label = label,
+                        value = valueOf(label),
+                        renaming = renamingLabel == label,
+                        renameText = renameText,
+                        onRenameText = { renameText = it },
+                        onBeginRename = { renamingLabel = label; renameText = label },
+                        onCommitRename = {
+                            val nl = renameText.trim()
+                            if (nl.isNotBlank() && nl != label && !template.contains(nl)) {
+                                val idx = template.indexOf(label)
+                                if (idx >= 0) template[idx] = nl
+                                val ev = valueOf(label)
+                                setValue(label, ""); setValue(nl, ev)
+                                persistTemplate()
+                            }
+                            renamingLabel = null
+                        },
+                        onCancelRename = { renamingLabel = null },
+                        onValue = { setValue(label, it) },
+                        onRemove = { template.remove(label); persistTemplate(); setValue(label, "") }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+        }
+
+        // 添加词条（写入全局模板，所有条目同步出现）
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NeuTextButton("＋ 添加词条") { showAdd = !showAdd; newLabel = "" }
+            if (showAdd) {
+                Spacer(Modifier.width(8.dp))
+                NeuField(newLabel, { newLabel = it }, hint = "新词条名", modifier = Modifier.weight(1f),
+                    onEnter = {
+                        val nl = newLabel.trim()
+                        if (nl.isNotBlank() && !template.contains(nl)) { template.add(nl); persistTemplate(); newLabel = ""; showAdd = false }
+                    })
+                Spacer(Modifier.width(8.dp))
+                NeuButton("确定", contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
+                    val nl = newLabel.trim()
+                    if (nl.isNotBlank() && !template.contains(nl)) { template.add(nl); persistTemplate(); newLabel = ""; showAdd = false }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+
         Box {
             NeuTextButton(
                 "分类：${model.categories.firstOrNull { it.id == catId }?.name ?: "未分类"} ▾"
@@ -804,22 +916,143 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
                 }
             }
         }
-        if (initial != null && initial.extras.isNotEmpty()) {
-            Text("自定义词条 ${initial.extras.size} 条将保留（词条编辑 P2）",
-                fontSize = 11.sp, color = neu.onSurfaceVariant)
-        }
         Spacer(Modifier.height(20.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             NeuTextButton("取消") { onDismiss() }
             Spacer(Modifier.width(10.dp))
             PrimaryButton("保存", modifier = Modifier.width(120.dp),
                 enabled = name.isNotBlank()) {
-                // 编辑时保留已有自定义词条（P2 才开放词条编辑），防保存误清
+                // 仅保留非空 label+value 的自定义词条进加密 extras（网站/备注走独立列）
+                val kept = extras.filter { it.label.isNotBlank() && it.value.isNotBlank() }
                 val input = EntryInput(
-                    name.trim(), username.trim(), password, website.trim(), notes,
-                    catId, initial?.extras ?: emptyList()
+                    name.trim(), username.trim(), password, website.trim(), notes, catId, kept
                 )
                 model.saveEntry(initial?.id, input) { ok -> if (ok) onDismiss() }
+            }
+        }
+    }
+}
+
+/** 自定义词条行：[词条名 ✎ | 值输入 | ✕]；✎ 就地改名（同步全局模板），✕ 删除（隐藏行并从本条移除）。 */
+@Composable
+private fun ExtraFieldRow(
+    label: String,
+    value: String,
+    renaming: Boolean,
+    renameText: String,
+    onRenameText: (String) -> Unit,
+    onBeginRename: () -> Unit,
+    onCommitRename: () -> Unit,
+    onCancelRename: () -> Unit,
+    onValue: (String) -> Unit,
+    onRemove: () -> Unit
+) {
+    val neu = LocalNeu.current
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        if (renaming) {
+            NeuField(renameText, onRenameText, hint = "词条名", modifier = Modifier.width(150.dp),
+                onEnter = onCommitRename)
+            Spacer(Modifier.width(6.dp))
+            NeuButton("确定", contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)) { onCommitRename() }
+            Spacer(Modifier.width(6.dp))
+            NeuTextButton("取消") { onCancelRename() }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.width(150.dp)) {
+                Text(label, fontSize = 14.sp, color = neu.onSurface, fontWeight = FontWeight.Medium, maxLines = 1)
+                Spacer(Modifier.width(4.dp))
+                NeuIconButton(onClick = onBeginRename, sizeDp = 26.dp) { Text("✎", fontSize = 11.sp) }
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        NeuField(value, onValue, hint = label, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(6.dp))
+        NeuIconButton(onClick = onRemove, sizeDp = 30.dp) { Text("✕", fontSize = 12.sp, color = neu.error) }
+    }
+}
+
+// ---------------- 批量录入弹窗（粘贴自由文本 → 解析 → 预览可编辑+勾选 → 导入，分类自动匹配） ----------------
+
+@Composable
+fun BatchImportDialog(model: AppModel, onDismiss: () -> Unit) {
+    val neu = LocalNeu.current
+    var raw by remember { mutableStateOf("") }
+    var parsed by remember { mutableStateOf<List<vault.ParsedEntry>>(emptyList()) }
+    var importing by remember { mutableStateOf(false) }
+
+    fun setField(i: Int, transform: (vault.ParsedEntry) -> vault.ParsedEntry) {
+        parsed = parsed.toMutableList().also { it[i] = transform(it[i]) }
+    }
+
+    NeuDialogShell(width = 640.dp, onDismiss = onDismiss) {
+        Text("批量录入", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(4.dp))
+        Text("粘贴账号笔记（每条以空行分隔，支持 平台/账号/密码/网站/分类/备注 等中英文标签，: ： = 分隔）→ 解析 → 校对 → 导入。",
+            fontSize = 12.sp, color = neu.onSurfaceVariant)
+        Spacer(Modifier.height(12.dp))
+        NeuField(raw, { raw = it }, hint = "在此粘贴文本…", singleLine = false, minLines = 5,
+            modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            NeuButton("解析") { parsed = vault.NoteParser.parse(raw) }
+            if (parsed.isNotEmpty()) {
+                NeuTextButton("清空") { parsed = emptyList(); raw = "" }
+            }
+        }
+
+        if (parsed.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+            Spacer(Modifier.height(12.dp))
+            Text("解析出 ${parsed.count { it.include }} / ${parsed.size} 条（取消勾选可排除）",
+                fontSize = 12.sp, color = neu.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                parsed.forEachIndexed { i, e ->
+                    NeuSurface(cornerRadius = 12.dp, contentPadding = PaddingValues(12.dp)) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (e.include) "☑" else "☐", fontSize = 18.sp, color = neu.primary,
+                                    modifier = Modifier.clickable { setField(i) { it.copy(include = !it.include) } })
+                                Spacer(Modifier.width(8.dp))
+                                Text("条目 ${i + 1}", fontSize = 12.sp, color = neu.onSurfaceVariant)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            NeuField(e.name, { v -> setField(i) { it.copy(name = v) } }, hint = "平台 *", modifier = Modifier.fillMaxWidth())
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                NeuField(e.username, { v -> setField(i) { it.copy(username = v) } }, hint = "账号", modifier = Modifier.weight(1f))
+                                NeuField(e.password, { v -> setField(i) { it.copy(password = v) } }, hint = "密码", modifier = Modifier.weight(1f))
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                NeuField(e.website, { v -> setField(i) { it.copy(website = v) } }, hint = "网站", modifier = Modifier.weight(1f))
+                                NeuField(e.category, { v -> setField(i) { it.copy(category = v) } }, hint = "分类", modifier = Modifier.weight(1f))
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            NeuField(e.notes, { v -> setField(i) { it.copy(notes = v) } }, hint = "备注", modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("取消") { onDismiss() }
+            Spacer(Modifier.width(10.dp))
+            PrimaryButton(
+                text = if (importing) "导入中…" else "导入 ${parsed.count { it.include }} 条",
+                modifier = Modifier.width(160.dp),
+                enabled = parsed.any { it.include } && !importing
+            ) {
+                importing = true
+                model.importBatch(parsed) { ok, failed ->
+                    model.note("批量录入完成：成功 $ok 条" + if (failed > 0) "，失败 $failed 条" else "")
+                    onDismiss()
+                }
             }
         }
     }

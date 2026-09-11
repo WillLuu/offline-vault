@@ -13,6 +13,8 @@ import com.qiqiao.passwordvault.R
 import com.qiqiao.passwordvault.data.Vault
 import com.qiqiao.passwordvault.model.EntryInput
 import com.qiqiao.passwordvault.ui.PwdBaseActivity
+import vault.NoteParser
+import vault.ParsedEntry
 
 /**
  * 批量录入：粘贴自由文本笔记 → 解析为多条 → 预览可编辑 → 顺序写入。

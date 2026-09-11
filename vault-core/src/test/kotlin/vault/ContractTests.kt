@@ -549,7 +549,7 @@ fun withFreshDb(block: (java.sql.Connection) -> Unit) {
 
 fun main(args: Array<String>) {
     vaultCryptoSelfTest(); vaultFormatSelfTest(); vaultMergeSelfTest(); jsonSelfTest(); vaultSessionSelfTest()
-    entryBlobSelfTest(); querySelfTest()
+    entryBlobSelfTest(); querySelfTest(); NoteParser.noteParserSelfTest()
     Class.forName("org.sqlite.JDBC")
     withFreshDb { checkListEntries(it) }
     withFreshDb { checkNoPlaintextMetadata(it) }
