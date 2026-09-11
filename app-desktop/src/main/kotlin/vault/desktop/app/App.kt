@@ -511,7 +511,7 @@ fun MainScreen(model: AppModel) {
                     modifier = Modifier.clip(CircleShape)
                         .clickable { showStats = true }
                 ) {
-                    NeuSurface(cornerRadius = 18.dp, elevation = 10.dp, contentPadding = PaddingValues(0.dp)) {
+                    NeuSurface(cornerRadius = 19.dp, elevation = 18.dp, contentPadding = PaddingValues(0.dp)) {
                         Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
                             Text("17°", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.primary)
                         }
@@ -634,7 +634,7 @@ private fun AvatarBadge(model: AppModel) {
         } else null
     }
     Box(
-        modifier = Modifier.shadow(6.dp, CircleShape).size(40.dp).clip(CircleShape)
+        modifier = Modifier.shadow(10.dp, CircleShape).size(40.dp).clip(CircleShape)
             .clickable { model.pickAvatar() },
         contentAlignment = Alignment.Center
     ) {
