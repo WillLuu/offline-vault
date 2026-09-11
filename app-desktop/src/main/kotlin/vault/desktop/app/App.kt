@@ -1,5 +1,6 @@
 package vault.desktop.app
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
@@ -28,6 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -91,7 +96,23 @@ class AppModel(private val vault: DesktopVault) {
         themeMode = mode
         java.util.prefs.Preferences.userRoot().node("offline-vault-desktop").putInt("themeMode", mode)
     }
+    /** 自定义头像图片路径（空=用品牌指纹兜底），Preferences 持久化，仅本机 */
+    var avatarPath by mutableStateOf(
+        java.util.prefs.Preferences.userRoot().node("offline-vault-desktop").get("avatarPath", "")
+    )
+    fun setAvatar(path: String) {
+        avatarPath = path
+        java.util.prefs.Preferences.userRoot().node("offline-vault-desktop").put("avatarPath", path)
+    }
+    /** 点击头像：选图片文件设为自定义头像（存路径，仅本机）。 */
+    fun pickAvatar() {
+        val f = awtOpenDialog(null, "选择头像图片") ?: return
+        setAvatar(f.absolutePath)
+    }
+    /** 恢复默认头像（清除自定义图片）。 */
+    fun resetAvatar() = setAvatar("")
     var categoryFilter by mutableStateOf<Long?>(null)
+    var totalActive by mutableStateOf(0)   // 全部有效条目数（数据统计用，独立于当前筛选）
 
     var autoLockSec by mutableStateOf(60)
     var clipboardSec by mutableStateOf(30)
@@ -146,6 +167,7 @@ class AppModel(private val vault: DesktopVault) {
         scope.launch {
             entries = vault.listEntries(search.takeIf { it.isNotBlank() }, sortBy, categoryFilter)
             categories = vault.listCategories()
+            totalActive = vault.listEntries().size   // 无筛选全量，供数据统计
         }
     }
 
@@ -465,6 +487,7 @@ fun MainScreen(model: AppModel) {
     var showEdit by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<PasswordEntryRow?>(null) }
     var showDelete by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
     val neu = LocalNeu.current
 
     Row(Modifier.fillMaxSize()) {
@@ -477,25 +500,23 @@ fun MainScreen(model: AppModel) {
                 .padding(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 22.dp)) {
-                // brand-mark：凸起指纹徽章（对齐移动端 46dp 锁徽标）
-                NeuSurface(cornerRadius = 12.dp,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)) {
-                    androidx.compose.material3.Icon(
-                        imageVector = fingerprintVector(neu.primary),
-                        contentDescription = "秘匣",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                // 左：自定义头像（点击换图；未设置时品牌指纹兜底）
+                AvatarBadge(model)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("秘匣 · 密码保险库", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
                     Text("NEUMORPHISM VAULT", fontSize = 9.sp, letterSpacing = 1.5.sp,
                         color = neu.onSurfaceVariant)
                 }
-                // avatar 位：凸起圆 17°（对齐移动端 44dp 头像）
-                NeuSurface(cornerRadius = 18.dp, contentPadding = PaddingValues(0.dp)) {
-                    Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                        Text("17°", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = neu.primary)
+                // 右：17° logo，点击 → 数据统计
+                Box(
+                    modifier = Modifier.clip(CircleShape)
+                        .clickable { showStats = true }
+                ) {
+                    NeuSurface(cornerRadius = 18.dp, contentPadding = PaddingValues(0.dp)) {
+                        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                            Text("17°", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = neu.primary)
+                        }
                     }
                 }
             }
@@ -583,6 +604,7 @@ fun MainScreen(model: AppModel) {
 
     if (showEdit) EditDialog(model, editTarget) { showEdit = false }
     if (showSettings) SettingsDialog(model) { showSettings = false }
+    if (showStats) StatisticsDialog(model) { showStats = false }
     if (showDelete) {
         val name = model.selectedDetail?.name ?: ""
         NeuDialogShell(width = 420.dp) {
@@ -599,6 +621,75 @@ fun MainScreen(model: AppModel) {
                 }
             }
         }
+    }
+}
+
+// ---------------- 侧栏头像 + 数据统计 ----------------
+
+/** 侧栏头像：自定义图片（圆形裁剪，点击换图）；未设置时品牌指纹兜底。 */
+@Composable
+private fun AvatarBadge(model: AppModel) {
+    val neu = LocalNeu.current
+    val path = model.avatarPath
+    val painter: BitmapPainter? = remember(path) {
+        if (path.isNotBlank()) {
+            try {
+                val img = javax.imageio.ImageIO.read(java.io.File(path))
+                if (img != null) BitmapPainter(img.toComposeImageBitmap()) else null
+            } catch (e: Exception) { null }
+        } else null
+    }
+    Box(
+        modifier = Modifier.size(40.dp).clip(CircleShape).clickable { model.pickAvatar() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (painter != null) {
+            Image(painter, contentDescription = "头像", contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize())
+        } else {
+            Box(Modifier.fillMaxSize().background(neu.sidebar), contentAlignment = Alignment.Center) {
+                androidx.compose.material3.Icon(fingerprintVector(neu.primary), "头像",
+                    modifier = Modifier.size(22.dp))
+            }
+        }
+    }
+}
+
+/** 数据统计（点击 17° logo）：条目总数 / 分类数 / 未分类 / 各分类条数。 */
+@Composable
+private fun StatisticsDialog(model: AppModel, onDismiss: () -> Unit) {
+    val neu = LocalNeu.current
+    val uncategorized = (model.totalActive - model.categories.sumOf { it.entryCount }).coerceAtLeast(0)
+    NeuDialogShell(width = 440.dp, onDismiss = onDismiss) {
+        Text("数据统计", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(16.dp))
+        StatRow("条目总数", model.totalActive, neu)
+        StatRow("分类数量", model.categories.size, neu)
+        StatRow("未分类条目", uncategorized, neu)
+        Spacer(Modifier.height(14.dp))
+        Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+        Spacer(Modifier.height(14.dp))
+        Text("各分类条数", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Column(Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+            model.categories.forEach { StatRow(it.name, it.entryCount, neu) }
+            if (model.categories.isEmpty()) Text("暂无分类", fontSize = 13.sp, color = neu.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            NeuTextButton("关闭") { onDismiss() }
+        }
+    }
+}
+
+@Composable
+private fun StatRow(label: String, value: Int, neu: NeuColors) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, fontSize = 14.sp, color = neu.onSurface)
+        Text("$value", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.primary)
     }
 }
 
