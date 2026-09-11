@@ -1172,11 +1172,22 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     var showAbout by remember { mutableStateOf(false) }
 
     NeuDialogShell(width = 540.dp) {
-        Column(
-            modifier = Modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState())
-        ) {
-            Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-            Spacer(Modifier.height(16.dp))
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
+                    modifier = Modifier.weight(1f))
+                // 右上角 × 关闭（符合点击习惯，且始终可见，不受内容滚动影响）
+                NeuIconButton(onClick = onDismiss, sizeDp = 32.dp) {
+                    Text("×", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = neu.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())
+            ) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1281,9 +1292,6 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text(it, fontSize = 13.sp, color = neu.onSurfaceVariant)
             }
-            Spacer(Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                NeuTextButton("关闭") { onDismiss() }
             }
         }
     }
