@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -333,10 +335,10 @@ class AppModel(private val vault: DesktopVault) {
 
 private val SortOptions = listOf(
     SortKey.UPDATED_DESC to "最近更新",
-    SortKey.NAME_ASC to "名称 A→Z",
-    SortKey.NAME_DESC to "名称 Z→A",
-    SortKey.CATEGORY_ASC to "分类 ↑",
-    SortKey.CATEGORY_DESC to "分类 ↓",
+    SortKey.NAME_ASC to "名称升序",
+    SortKey.NAME_DESC to "名称降序",
+    SortKey.CATEGORY_ASC to "分类升序",
+    SortKey.CATEGORY_DESC to "分类降序",
 )
 
 @Composable
@@ -463,12 +465,10 @@ fun MainScreen(model: AppModel) {
     var showEdit by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<PasswordEntryRow?>(null) }
     var showDelete by remember { mutableStateOf(false) }
-    var showCatManage by remember { mutableStateOf(false) }
-    var showBatch by remember { mutableStateOf(false) }
     val neu = LocalNeu.current
 
     Row(Modifier.fillMaxSize()) {
-        // ========== 左侧栏：Logo + 分类 + 底部操作 ==========
+        // ========== 左侧栏：Logo + 可滚动分类导航 + 固定底部操作 ==========
         Column(
             modifier = Modifier
                 .width(230.dp)
@@ -489,28 +489,33 @@ fun MainScreen(model: AppModel) {
                 Text("秘匣", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
             }
 
-            NavItem("全部条目", model.entries.size, model.categoryFilter == null) {
-                model.filterByCategory(null)
-            }
-            model.categories.forEach { c ->
-                NavItem(c.name, c.entryCount, model.categoryFilter == c.id) {
-                    model.filterByCategory(c.id)
+            // 导航区：独立滚动，分类再多也不会把底部三键挤下去（底部位置固定）
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+            ) {
+                NavItem("全部条目", model.entries.size, model.categoryFilter == null) {
+                    model.filterByCategory(null)
+                }
+                model.categories.forEach { c ->
+                    NavItem(c.name, c.entryCount, model.categoryFilter == c.id) {
+                        model.filterByCategory(c.id)
+                    }
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NeuTextButton("🗂 分类管理", modifier = Modifier.weight(1f)) { showCatManage = true }
-                NeuTextButton("📥 批量录入", modifier = Modifier.weight(1f)) { showBatch = true }
-            }
 
-            Spacer(Modifier.weight(1f))
-            PrimaryButton("＋ 新增条目", modifier = Modifier.fillMaxWidth()) {
-                editTarget = null; showEdit = true
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                NeuTextButton("⚙ 设置") { showSettings = true }
-                NeuTextButton("🔒 锁定") { model.lockNow() }
+            Spacer(Modifier.height(12.dp))
+            // 固定底部：设置 / + 新增 / 锁定（一行排开）
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NeuTextButton("设置", modifier = Modifier.weight(1f)) { showSettings = true }
+                NeuButton("+", modifier = Modifier.width(52.dp),
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 11.dp)) {
+                    editTarget = null; showEdit = true
+                }
+                NeuTextButton("锁定", modifier = Modifier.weight(1f)) { model.lockNow() }
             }
         }
 
@@ -525,7 +530,7 @@ fun MainScreen(model: AppModel) {
                 .padding(12.dp)
         ) {
             NeuField(model.search, { model.onSearchChange(it) },
-                hint = "🔍 搜索名称或用户名", modifier = Modifier.fillMaxWidth())
+                hint = "搜索名称或用户名", modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -567,8 +572,6 @@ fun MainScreen(model: AppModel) {
 
     if (showEdit) EditDialog(model, editTarget) { showEdit = false }
     if (showSettings) SettingsDialog(model) { showSettings = false }
-    if (showCatManage) CategoryManageDialog(model) { showCatManage = false }
-    if (showBatch) BatchImportDialog(model) { showBatch = false }
     if (showDelete) {
         val name = model.selectedDetail?.name ?: ""
         NeuDialogShell(width = 420.dp) {
@@ -671,11 +674,9 @@ private fun EmptyState(hint: String, onAdd: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("🔑", fontSize = 40.sp)
-        Spacer(Modifier.height(14.dp))
         Text(hint, fontSize = 15.sp, color = neu.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(22.dp))
-        PrimaryButton("＋ 新增条目", modifier = Modifier.width(190.dp), onClick = onAdd)
+        PrimaryButton("新增条目", modifier = Modifier.width(190.dp), onClick = onAdd)
     }
 }
 
@@ -693,11 +694,9 @@ private fun RowScope.DetailPane(
     if (e == null) {
         Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("🔑", fontSize = 36.sp)
-                Spacer(Modifier.height(10.dp))
                 Text("选择左侧条目查看详情", fontSize = 15.sp, color = neu.onSurfaceVariant)
                 Spacer(Modifier.height(18.dp))
-                PrimaryButton("＋ 新增条目", modifier = Modifier.width(190.dp), onClick = onAdd)
+                PrimaryButton("新增条目", modifier = Modifier.width(190.dp), onClick = onAdd)
             }
         }
         return
@@ -741,9 +740,7 @@ private fun FieldRow(label: String, value: String, model: AppModel) {
                 color = neu.onSurface,
                 fontSize = 15.sp
             )
-            NeuIconButton(onClick = { model.copySecret(value, label) }, sizeDp = 36.dp) {
-                Text("⧉", color = neu.accent, fontSize = 15.sp)
-            }
+            NeuTextButton("复制") { model.copySecret(value, label) }
         }
     }
 }
@@ -762,12 +759,9 @@ private fun PasswordRow(password: String, model: AppModel) {
                 color = if (revealed) neu.primary else neu.onSurface,
                 fontSize = 15.sp
             )
-            NeuIconButton(onClick = { revealed = !revealed }, sizeDp = 36.dp) {
-                Text(if (revealed) "🙈" else "👁", fontSize = 14.sp)
-            }
-            NeuIconButton(onClick = { model.copySecret(password, "密码") }, sizeDp = 36.dp) {
-                Text("⧉", color = neu.accent, fontSize = 15.sp)
-            }
+            NeuTextButton(if (revealed) "隐藏" else "显示") { revealed = !revealed }
+            Spacer(Modifier.width(6.dp))
+            NeuTextButton("复制") { model.copySecret(password, "密码") }
         }
     }
 }
@@ -836,9 +830,7 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
             NeuField(password, { password = it }, hint = "密码", isPassword = true,
                 modifier = Modifier.weight(1f))
             Spacer(Modifier.width(8.dp))
-            NeuIconButton(onClick = { revealed = !revealed }, sizeDp = 40.dp) {
-                Text(if (revealed) "🙈" else "👁", fontSize = 13.sp)
-            }
+            NeuTextButton(if (revealed) "隐藏" else "显示") { revealed = !revealed }
             Spacer(Modifier.width(6.dp))
             NeuButton("生成") { password = generatePassword(20, com.qiqiao.passwordvault.util.CharsetFlags()) }
         }
@@ -888,7 +880,7 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
 
         // 添加词条（写入全局模板，所有条目同步出现）
         Row(verticalAlignment = Alignment.CenterVertically) {
-            NeuTextButton("＋ 添加词条") { showAdd = !showAdd; newLabel = "" }
+            NeuTextButton("添加词条") { showAdd = !showAdd; newLabel = "" }
             if (showAdd) {
                 Spacer(Modifier.width(8.dp))
                 NeuField(newLabel, { newLabel = it }, hint = "新词条名", modifier = Modifier.weight(1f),
@@ -958,15 +950,17 @@ private fun ExtraFieldRow(
             NeuTextButton("取消") { onCancelRename() }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.width(150.dp)) {
-                Text(label, fontSize = 14.sp, color = neu.onSurface, fontWeight = FontWeight.Medium, maxLines = 1)
-                Spacer(Modifier.width(4.dp))
-                NeuIconButton(onClick = onBeginRename, sizeDp = 26.dp) { Text("✎", fontSize = 11.sp) }
+                Text(label, fontSize = 14.sp, color = neu.onSurface, fontWeight = FontWeight.Medium, maxLines = 1,
+                    modifier = Modifier.weight(1f))
+                Text("改名", fontSize = 12.sp, color = neu.primary,
+                    modifier = Modifier.clickable { onBeginRename() })
             }
         }
         Spacer(Modifier.width(8.dp))
         NeuField(value, onValue, hint = label, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(6.dp))
-        NeuIconButton(onClick = onRemove, sizeDp = 30.dp) { Text("✕", fontSize = 12.sp, color = neu.error) }
+        Text("删除", fontSize = 12.sp, color = neu.error,
+            modifier = Modifier.clickable { onRemove() })
     }
 }
 
@@ -1014,8 +1008,11 @@ fun BatchImportDialog(model: AppModel, onDismiss: () -> Unit) {
                     NeuSurface(cornerRadius = 12.dp, contentPadding = PaddingValues(12.dp)) {
                         Column(Modifier.fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(if (e.include) "☑" else "☐", fontSize = 18.sp, color = neu.primary,
-                                    modifier = Modifier.clickable { setField(i) { it.copy(include = !it.include) } })
+                                Checkbox(
+                                    checked = e.include,
+                                    onCheckedChange = { setField(i) { it.copy(include = !it.include) } },
+                                    colors = CheckboxDefaults.colors(checkedColor = neu.primary)
+                                )
                                 Spacer(Modifier.width(8.dp))
                                 Text("条目 ${i + 1}", fontSize = 12.sp, color = neu.onSurfaceVariant)
                             }
@@ -1070,6 +1067,8 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     var showChangePw by remember { mutableStateOf(false) }
     var showExport by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
+    var showCatManage by remember { mutableStateOf(false) }
+    var showBatch by remember { mutableStateOf(false) }
 
     NeuDialogShell(width = 540.dp) {
         Column {
@@ -1120,6 +1119,17 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
                 NeuButton("导入 .vault…") { msg = null; showImport = true }
             }
 
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
+            Spacer(Modifier.height(14.dp))
+            Text("数据管理", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Row {
+                NeuButton("分类管理…") { showCatManage = true }
+                Spacer(Modifier.width(12.dp))
+                NeuButton("批量录入…") { showBatch = true }
+            }
+
             msg?.let {
                 Spacer(Modifier.height(12.dp))
                 Text(it, fontSize = 13.sp, color = neu.onSurfaceVariant)
@@ -1134,6 +1144,8 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     if (showChangePw) ChangePwDialog(model, onDone = { m -> msg = m; showChangePw = false })
     if (showExport) ExportDialog(model, onDone = { m -> msg = m; showExport = false })
     if (showImport) ImportDialog(model, onDone = { m -> msg = m; showImport = false })
+    if (showCatManage) CategoryManageDialog(model) { showCatManage = false }
+    if (showBatch) BatchImportDialog(model) { showBatch = false }
 }
 
 @Composable
@@ -1290,7 +1302,7 @@ fun CategoryManageDialog(model: AppModel, onDismiss: () -> Unit) {
             NeuField(newCat, { newCat = it }, hint = "新分类名称", modifier = Modifier.weight(1f),
                 onEnter = { model.createCategory(newCat); newCat = "" })
             Spacer(Modifier.width(10.dp))
-            NeuButton("＋ 添加", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+            NeuButton("添加", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
                 model.createCategory(newCat); newCat = ""
             }
         }
