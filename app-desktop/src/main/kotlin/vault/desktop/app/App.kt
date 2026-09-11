@@ -1180,23 +1180,23 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Bottom
             ) {
                 Column(Modifier.weight(1f)) {
                     Text("自动锁超时（秒，0=不超时）", fontSize = 12.sp, color = neu.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
-                    NeuField(lockSec, { lockSec = it }, hint = "秒",
-                        modifier = Modifier.fillMaxWidth(0.42f))
-                    Spacer(Modifier.height(14.dp))
-                    Text("剪贴板清除延时（秒，0=永不自动清除）", fontSize = 12.sp, color = neu.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    NeuField(clipSec, { clipSec = it }, hint = "秒",
-                        modifier = Modifier.fillMaxWidth(0.42f))
+                    NeuField(lockSec, { lockSec = it }, hint = "秒", modifier = Modifier.fillMaxWidth())
                 }
-                Spacer(Modifier.width(16.dp))
-                // 正方形保存按钮，靠右对齐
-                NeuButton("保存", modifier = Modifier.size(76.dp),
-                    contentPadding = PaddingValues(0.dp)) {
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("剪贴板清除延时（秒，0=永不）", fontSize = 12.sp, color = neu.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    NeuField(clipSec, { clipSec = it }, hint = "秒", modifier = Modifier.fillMaxWidth())
+                }
+                Spacer(Modifier.width(12.dp))
+                // 保存按钮：矮身，与两输入框同行靠右
+                NeuButton("保存", modifier = Modifier.width(72.dp),
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 9.dp)) {
                     val l = lockSec.toIntOrNull(); val c = clipSec.toIntOrNull()
                     if (l == null || c == null || l < 0 || c < 0) msg = "请输入非负整数"
                     else model.saveSettings(l, c) { msg = it }
@@ -1206,13 +1206,18 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
             Spacer(Modifier.height(18.dp))
             Box(Modifier.fillMaxWidth().height(2.dp).background(neu.divider))
             Spacer(Modifier.height(14.dp))
-            Text("配色主题（与手机端同款色板）", fontSize = 15.sp,
-                fontWeight = FontWeight.Bold, color = neu.onSurface)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("配色主题", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface,
+                    modifier = Modifier.weight(1f))
                 NeuThemeNames.forEachIndexed { i, label ->
-                    if (model.themeMode == i) NeuButton(label) { }
-                    else NeuTextButton(label) { model.setTheme(i) }
+                    if (i > 0) Spacer(Modifier.width(8.dp))
+                    if (model.themeMode == i)
+                        NeuButton(label, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) { }
+                    else
+                        NeuTextButton(label) { model.setTheme(i) }
                 }
             }
 
