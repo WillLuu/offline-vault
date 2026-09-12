@@ -506,16 +506,14 @@ fun MainScreen(model: AppModel) {
                 Column(Modifier.weight(1f)) {
                     Text("秘匣 · 密码保险库", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
                 }
-                // 右：17° logo，点击 → 数据统计
+                // 右：17° logo，点击 → 数据统计。
+                // 阴影在外层、背景才裁剪（先 shadow 再 clip），否则圆形裁剪会把外侧阴影切掉→看不见立体。
                 Box(
-                    modifier = Modifier.clip(CircleShape)
-                        .clickable { showStats = true }
+                    modifier = Modifier.size(42.dp).shadow(14.dp, CircleShape).clip(CircleShape)
+                        .background(neu.surface).clickable { showStats = true },
+                    contentAlignment = Alignment.Center
                 ) {
-                    NeuSurface(cornerRadius = 19.dp, elevation = 18.dp, contentPadding = PaddingValues(0.dp)) {
-                        Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
-                            Text("17°", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.primary)
-                        }
-                    }
+                    Text("17°", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.primary)
                 }
             }
 
