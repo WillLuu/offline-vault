@@ -1261,7 +1261,7 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
             Spacer(Modifier.height(14.dp))
             Text("关于", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
             Spacer(Modifier.height(8.dp))
-            AboutRow("版本", "v1.1.0（桌面版）")
+            AboutRow("版本", "v1.2.0（桌面版）")
             AboutRow("开发者", "Will Joel (L17) / 拾柒")
             AboutRow("开源许可", "MIT License（详见根目录 LICENSE）")
             Spacer(Modifier.height(10.dp))
@@ -1303,7 +1303,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
         Text("纯离线密码管理器 · Android + Windows 桌面双端 · 数据本地加密存储，无网络、无账号、无云同步。",
             fontSize = 13.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
-        AboutRow("版本", "v1.1.0（桌面版）")
+        AboutRow("版本", "v1.2.0（桌面版）")
         AboutRow("开发者", "Will Joel (L17) / 拾柒")
         AboutRow("开源许可", "MIT License（详见根目录 LICENSE）")
         Spacer(Modifier.height(16.dp))
