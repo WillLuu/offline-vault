@@ -226,7 +226,8 @@ fun NeuButton(
     // 的原始轮廓绘制，按下缩放会让投影"脱胶"露在按钮外圈，形成明显深色边缘。
     // 按压反馈改由按钮自身颜色加深承担（纯内部变化，不产生外圈）。
     // 禁用态投影归零：浅灰填充 + 深色投影带 = 看起来像一圈边框。
-    val shadow = if (enabled) 2.dp else 0.dp
+    // 浅色底上紫按钮投影调低（1dp），深色底保持 2dp。
+    val shadow = if (!enabled) 0.dp else if (neu.isDark) 2.dp else 1.dp
 
     // 全部用不透明混色：半透明填充会让图层投影从内部透出来，形成边缘暗圈
     val bg = when {
