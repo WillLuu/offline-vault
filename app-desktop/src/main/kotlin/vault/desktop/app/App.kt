@@ -363,6 +363,9 @@ private val SortOptions = listOf(
     SortKey.CATEGORY_DESC to "分类降序",
 )
 
+// 内置固定词条：手机/邮箱/网站/备注 始终显示且不可改名/删除；仅用户后续新增的自定义词条可改。
+private val BUILTIN_FIELDS = setOf("手机", "邮箱", "网站", "备注")
+
 @Composable
 fun AppRoot(model: AppModel) {
     val neu = LocalNeu.current
@@ -903,8 +906,8 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
             else -> extras.add(ExtraField(label, v))
         }
     }
-    // 行序：备注永远排最后（对齐移动端 rowOrder）。
-    val orderedLabels = template.filter { it != "备注" } + template.filter { it == "备注" }
+    // 内置固定字段（手机/邮箱/网站/备注）始终显示且不可改名/删除；仅用户后续新增的自定义词条可改。
+    val customLabels = template.filterNot { it in BUILTIN_FIELDS }
 
     NeuDialogShell(width = 540.dp, title = if (initial == null) "新增条目" else "编辑条目", onDismiss = onDismiss) {
         NeuField(name, { name = it }, hint = "平台 *", modifier = Modifier.fillMaxWidth())
@@ -923,44 +926,42 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
         Text("强度：${strengthLabel(passwordStrength(password))}",
             fontSize = 11.sp, color = neu.onSurfaceVariant)
         Spacer(Modifier.height(12.dp))
-        // 模板驱动的词条行：网站/备注映射独立列；其余（邮箱/自定义）为可增删改的 extras 行
-        orderedLabels.forEach { label ->
-            when (label) {
-                "网站" -> {
-                    NeuField(website, { website = it }, hint = "网站", modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(12.dp))
-                }
-                "备注" -> {
-                    NeuField(notes, { notes = it }, hint = "备注", singleLine = false, minLines = 3,
-                        modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(12.dp))
-                }
-                else -> {
-                    ExtraFieldRow(
-                        label = label,
-                        value = valueOf(label),
-                        renaming = renamingLabel == label,
-                        renameText = renameText,
-                        onRenameText = { renameText = it },
-                        onBeginRename = { renamingLabel = label; renameText = label },
-                        onCommitRename = {
-                            val nl = renameText.trim()
-                            if (nl.isNotBlank() && nl != label && !template.contains(nl)) {
-                                val idx = template.indexOf(label)
-                                if (idx >= 0) template[idx] = nl
-                                val ev = valueOf(label)
-                                setValue(label, ""); setValue(nl, ev)
-                                persistTemplate()
-                            }
-                            renamingLabel = null
-                        },
-                        onCancelRename = { renamingLabel = null },
-                        onValue = { setValue(label, it) },
-                        onRemove = { template.remove(label); persistTemplate(); setValue(label, "") }
-                    )
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
+        // 内置附加词条：手机 / 邮箱（值存 extras，不可改名/删除）
+        SimpleFieldRow("手机", valueOf("手机")) { setValue("手机", it) }
+        Spacer(Modifier.height(12.dp))
+        SimpleFieldRow("邮箱", valueOf("邮箱")) { setValue("邮箱", it) }
+        Spacer(Modifier.height(12.dp))
+        // 网站 / 备注：独立加密列（固定，不可改名/删除）
+        NeuField(website, { website = it }, hint = "网站", modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(12.dp))
+        NeuField(notes, { notes = it }, hint = "备注", singleLine = false, minLines = 3,
+            modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(12.dp))
+        // 自定义词条（用户新增，可改名/删除）
+        customLabels.forEach { label ->
+            ExtraFieldRow(
+                label = label,
+                value = valueOf(label),
+                renaming = renamingLabel == label,
+                renameText = renameText,
+                onRenameText = { renameText = it },
+                onBeginRename = { renamingLabel = label; renameText = label },
+                onCommitRename = {
+                    val nl = renameText.trim()
+                    if (nl.isNotBlank() && nl != label && nl !in BUILTIN_FIELDS && !template.contains(nl)) {
+                        val idx = template.indexOf(label)
+                        if (idx >= 0) template[idx] = nl
+                        val ev = valueOf(label)
+                        setValue(label, ""); setValue(nl, ev)
+                        persistTemplate()
+                    }
+                    renamingLabel = null
+                },
+                onCancelRename = { renamingLabel = null },
+                onValue = { setValue(label, it) },
+                onRemove = { template.remove(label); persistTemplate(); setValue(label, "") }
+            )
+            Spacer(Modifier.height(12.dp))
         }
 
         // 添加词条（写入全局模板，所有条目同步出现）
@@ -971,12 +972,12 @@ fun EditDialog(model: AppModel, initial: PasswordEntryRow?, onDismiss: () -> Uni
                 NeuField(newLabel, { newLabel = it }, hint = "新词条名", modifier = Modifier.weight(1f),
                     onEnter = {
                         val nl = newLabel.trim()
-                        if (nl.isNotBlank() && !template.contains(nl)) { template.add(nl); persistTemplate(); newLabel = ""; showAdd = false }
+                        if (nl.isNotBlank() && nl !in BUILTIN_FIELDS && !template.contains(nl)) { template.add(nl); persistTemplate(); newLabel = ""; showAdd = false }
                     })
                 Spacer(Modifier.width(8.dp))
                 NeuButton("确定", contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
                     val nl = newLabel.trim()
-                    if (nl.isNotBlank() && !template.contains(nl)) { template.add(nl); persistTemplate(); newLabel = ""; showAdd = false }
+                    if (nl.isNotBlank() && nl !in BUILTIN_FIELDS && !template.contains(nl)) { template.add(nl); persistTemplate(); newLabel = ""; showAdd = false }
                 }
             }
         }
@@ -1044,6 +1045,18 @@ private fun ExtraFieldRow(
         Spacer(Modifier.width(6.dp))
         Text("删除", fontSize = 12.sp, color = neu.error,
             modifier = Modifier.clickable { onRemove() })
+    }
+}
+
+/** 内置固定词条行：仅 [标签 + 输入框]，无改名/删除（手机/邮箱等）。 */
+@Composable
+private fun SimpleFieldRow(label: String, value: String, onValue: (String) -> Unit) {
+    val neu = LocalNeu.current
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = neu.onSurface,
+            modifier = Modifier.width(70.dp))
+        Spacer(Modifier.width(8.dp))
+        NeuField(value, onValue, hint = label, modifier = Modifier.weight(1f))
     }
 }
 

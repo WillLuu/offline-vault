@@ -16,8 +16,8 @@ object DesktopFieldTemplate {
     private const val KEY = "fieldTemplate"
     private const val SEP = "\u0001"
 
-    /** 默认词条（按序）：邮箱 / 网站 / 备注。 */
-    val DEFAULTS = listOf("邮箱", "网站", "备注")
+    /** 模板仅存"自定义词条"（手机/邮箱/网站/备注 为内置固定字段，始终显示、不入模板）。默认无自定义。 */
+    val DEFAULTS = emptyList<String>()
 
     fun load(): MutableList<String> {
         val raw = node.get(KEY, null) ?: return DEFAULTS.toMutableList()
