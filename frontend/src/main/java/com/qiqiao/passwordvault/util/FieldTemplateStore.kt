@@ -14,12 +14,9 @@ object FieldTemplateStore {
     private const val PREFS = "field_template"
     private const val KEY = "labels"
 
-    /** 默认词条（按序）：邮箱 / 网站 / 备注。 */
-    fun defaults(ctx: Context): List<String> = listOf(
-        ctx.getString(R.string.edit_email),
-        ctx.getString(R.string.edit_website),
-        ctx.getString(R.string.edit_notes)
-    )
+    /** 模板仅存"自定义词条"（手机/邮箱/网站/备注 为内置固定字段，始终显示、不入模板）。默认无自定义。 */
+    @Suppress("UNUSED_PARAMETER")
+    fun defaults(ctx: Context): List<String> = emptyList()
 
     fun load(ctx: Context): MutableList<String> {
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

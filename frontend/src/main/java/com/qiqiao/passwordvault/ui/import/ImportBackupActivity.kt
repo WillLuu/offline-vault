@@ -2,8 +2,10 @@ package com.qiqiao.passwordvault.ui.import
 
 import com.qiqiao.passwordvault.ui.PwdBaseActivity
 import android.content.Intent
+import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -88,11 +90,25 @@ class ImportBackupActivity : PwdBaseActivity() {
                                 getString(R.string.import_no_file)
                         } else {
                             fileBytes = bytes
-                            findViewById<TextView>(R.id.tvFileName).text =
-                                it.lastPathSegment ?: "backup.vault"
+                            findViewById<TextView>(R.id.tvFileName).apply {
+                                text = displayName(it)
+                                visibility = View.VISIBLE
+                            }
                         }
                     }
                 }
             }
+    }
+
+    /** 从 content uri 解析真实显示文件名（lastPathSegment 对 SAF/媒体 uri 常是数字 id，不可读）。 */
+    private fun displayName(uri: Uri): String {
+        var name: String? = null
+        try {
+            contentResolver.query(uri, null, null, null, null)?.use { c: Cursor ->
+                val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && c.moveToFirst()) name = c.getString(idx)
+            }
+        } catch (e: Exception) { android.util.Log.w("Import", "读取 DISPLAY_NAME 失败", e) }
+        return name ?: (uri.lastPathSegment?.substringAfterLast('/') ?: "已选择备份文件")
     }
 }

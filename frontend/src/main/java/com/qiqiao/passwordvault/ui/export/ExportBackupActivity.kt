@@ -2,8 +2,10 @@ package com.qiqiao.passwordvault.ui.export
 
 import com.qiqiao.passwordvault.ui.PwdBaseActivity
 import android.content.Intent
+import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -144,7 +146,7 @@ class ExportBackupActivity : PwdBaseActivity() {
                 out.close()
             }
             src.delete() // 写入成功才删本地副本
-            goDone()
+            goDone(displayName(uri)) // 完成页显示用户实际保存的文件名（可能已在 SAF 里改名），而非暂存默认名
         } catch (e: Exception) {
             android.util.Log.e("Export", "SAF 写入失败", e)
             Toast.makeText(
@@ -156,10 +158,21 @@ class ExportBackupActivity : PwdBaseActivity() {
         }
     }
 
-    private fun goDone() {
-        val name = pendingFileName ?: "backup.vault"
-        startActivity(Intent(this, ExportDoneActivity::class.java).putExtra("fileName", name))
+    private fun goDone(savedName: String) {
+        startActivity(Intent(this, ExportDoneActivity::class.java).putExtra("fileName", savedName))
         finish()
+    }
+
+    /** 从 SAF content uri 解析用户实际保存的显示名（改名后以此为准）；取不到则回退末段/默认。 */
+    private fun displayName(uri: Uri): String {
+        var name: String? = null
+        try {
+            contentResolver.query(uri, null, null, null, null)?.use { c: Cursor ->
+                val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && c.moveToFirst()) name = c.getString(idx)
+            }
+        } catch (e: Exception) { android.util.Log.w("Export", "读取 DISPLAY_NAME 失败", e) }
+        return name ?: (uri.lastPathSegment?.substringAfterLast('/') ?: "备份文件")
     }
 
     companion object {

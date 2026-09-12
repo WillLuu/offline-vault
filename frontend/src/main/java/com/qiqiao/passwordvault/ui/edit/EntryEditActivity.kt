@@ -78,8 +78,7 @@ class EntryEditActivity : PwdBaseActivity() {
             )
         }
         findViewById<Button>(R.id.btnSave).setOnClickListener { save() }
-        // 底部常驻保存栏（2026-09-06 用户需求）：长表单滚到下方也能直接保存，同一 handler
-        findViewById<Button>(R.id.btnSaveBottom).setOnClickListener { save() }
+        // 顶栏右上角保存已常驻可见（顶栏在 ScrollView 外），不再需要底部保存栏。
 
         // 密码显隐眼睛（2026-09-06 用户需求）：默认掩码，点眼切明文核对；视觉态与列表卡/详情页 eye 一致
         val btnEyePw = findViewById<ImageButton>(R.id.btnEyePw)
@@ -136,30 +135,33 @@ class EntryEditActivity : PwdBaseActivity() {
 
     // ---- 词条区 ----
 
-    // 行序：备注永远排最后（模板内备注先摘出，末尾再补）。
-    private fun rowOrder(labels: List<String>): List<String> {
-        val notes = getString(R.string.edit_notes)
-        return labels.filter { it != notes } + labels.filter { it == notes }
-    }
+    // 内置固定字段（不可改名/删除），顺序：手机 / 邮箱 / 网站 / 备注（平台/帐号/密码为顶部固定输入框）。
+    private fun builtinLabels(): List<String> = listOf(
+        getString(R.string.edit_phone), getString(R.string.edit_email),
+        getString(R.string.edit_website), getString(R.string.edit_notes)
+    )
 
-    // emptyValues=true（新增）：模板词条空行；否则按 values[label] 填（缺失 → 空行，仍展示词条）。
+    // emptyValues=true（新增）：字段空行；否则按 values[label] 填。
+    // 内置字段始终按序渲染且不可改名/删除；自定义词条（模板中非内置项）可改名/删除。
     private fun rebuildFieldRows(emptyValues: Boolean = false, values: Map<String, String> = emptyMap()) {
         fieldRows.clear()
         llExtraFields.removeAllViews()
-        val notes = getString(R.string.edit_notes)
-        val template = FieldTemplateStore.load(this)
-        val seen = mutableSetOf<String>()
-        rowOrder(template).forEach { label ->
-            addFieldRow(label, if (emptyValues) "" else (values[label] ?: ""))
-            seen.add(label)
+        val builtin = builtinLabels()
+        builtin.forEach { label ->
+            addFieldRow(label, if (emptyValues) "" else (values[label] ?: ""), editable = false)
         }
-        // 旧数据词条（不在模板）逐条展示（备注不会出现在此处——备注有独立列）
+        val custom = FieldTemplateStore.load(this).filterNot { it in builtin }
+        custom.forEach { label ->
+            addFieldRow(label, if (emptyValues) "" else (values[label] ?: ""), editable = true)
+        }
+        // 旧数据里既非内置、也不在模板的孤儿自定义词条：仍展示、可删（备注/网站有独立列不会落到这里）
+        val seen = (builtin + custom).toSet()
         values.forEach { (label, v) ->
-            if (!seen.contains(label) && label != notes && v.isNotBlank()) addFieldRow(label, v)
+            if (label !in seen && v.isNotBlank()) addFieldRow(label, v, editable = true)
         }
     }
 
-    private fun addFieldRow(label: String, value: String) {
+    private fun addFieldRow(label: String, value: String, editable: Boolean) {
         val view = layoutInflater.inflate(R.layout.view_edit_field_row, llExtraFields, false)
         val row = FieldRow(
             view = view,
@@ -180,8 +182,16 @@ class EntryEditActivity : PwdBaseActivity() {
                 row.etValue.paddingRight, row.etValue.paddingBottom
             )
         }
-        view.findViewById<View>(R.id.btnRenameField).setOnClickListener { showRenameFieldDialog(row) }
-        view.findViewById<View>(R.id.btnDeleteField).setOnClickListener { confirmDeleteField(row) }
+        val btnRename = view.findViewById<View>(R.id.btnRenameField)
+        val btnDelete = view.findViewById<View>(R.id.btnDeleteField)
+        if (editable) {
+            btnRename.setOnClickListener { showRenameFieldDialog(row) }
+            btnDelete.setOnClickListener { confirmDeleteField(row) }
+        } else {
+            // 内置字段：隐藏改名/删除入口
+            btnRename.visibility = View.GONE
+            btnDelete.visibility = View.GONE
+        }
         llExtraFields.addView(view)
         fieldRows.add(row)
     }
@@ -204,7 +214,7 @@ class EntryEditActivity : PwdBaseActivity() {
                     return@showInput false
                 }
                 FieldTemplateStore.add(this, label)   // 全局模板：所有密码卡片同步
-                addFieldRow(label, "")
+                addFieldRow(label, "", editable = true)
                 true
             }
         )

@@ -185,25 +185,8 @@
         </com.qiqiao.passwordvault.ui.common.NeuSurface>
     </ScrollView>
 
-    <!-- 底部常驻保存栏（2026-09-06 用户需求）：长表单/键盘弹起时始终可见可点，
-         与顶部保存同一 handler；样式复刻顶部保存按钮（NeuSurface raised + 透明 Button），仅撑满宽度 -->
-    <com.qiqiao.passwordvault.ui.common.NeuSurface
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginLeft="4dp" android:layout_marginRight="4dp"
-        android:layout_marginBottom="6dp"
-        app:neuDirection="raised"
-        app:neuElevation="sm"
-        app:neuCornerRadius="@dimen/radius_field"
-        android:clipChildren="false" android:clipToPadding="false">
-
-        <Button android:id="@+id/btnSaveBottom"
-            android:layout_width="match_parent" android:layout_height="44dp"
-            android:layout_margin="6dp"
-            android:background="@android:color/transparent"
-            android:textColor="?attr/colorOnPrimary"
-            android:text="@string/edit_save" android:textAllCaps="false"
-            android:textStyle="bold" />
-    </com.qiqiao.passwordvault.ui.common.NeuSurface>
+    <!-- 保存：仅保留顶栏右上角按钮（顶栏在 ScrollView 之外，滚动时始终吸顶可见，
+         编辑到底部也能直接点，无需回滚）。原底部大保存栏冗余且占高，已移除。 -->
 
     <!-- 底部导航（2026-09-06）：主页 / 数据管理 / ＋新增(当前) / 设置；新增/编辑共用本页 -->
     <com.qiqiao.passwordvault.ui.common.NeuSurface
