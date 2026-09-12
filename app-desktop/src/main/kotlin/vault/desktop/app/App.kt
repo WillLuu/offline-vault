@@ -487,7 +487,6 @@ fun MainScreen(model: AppModel) {
     var showEdit by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<PasswordEntryRow?>(null) }
     var showDelete by remember { mutableStateOf(false) }
-    var showStats by remember { mutableStateOf(false) }
     val neu = LocalNeu.current
 
     Row(Modifier.fillMaxSize()) {
@@ -502,19 +501,8 @@ fun MainScreen(model: AppModel) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 22.dp)) {
                 // 左：自定义头像（点击换图；未设置时品牌指纹兜底）
                 AvatarBadge(model)
-                Spacer(Modifier.width(4.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("秘匣 · 密码保险库", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
-                }
-                // 右：17° logo，点击 → 数据统计。
-                // 阴影在外层、背景才裁剪（先 shadow 再 clip），否则圆形裁剪会把外侧阴影切掉→看不见立体。
-                Box(
-                    modifier = Modifier.size(42.dp).shadow(14.dp, CircleShape).clip(CircleShape)
-                        .background(neu.surface).clickable { showStats = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("17°", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = neu.primary)
-                }
+                Spacer(Modifier.width(8.dp))
+                Text("秘匣 · 密码保险库", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = neu.onSurface)
             }
 
             // 导航区：独立滚动，分类再多也不会把底部三键挤下去（底部位置固定）
@@ -600,7 +588,6 @@ fun MainScreen(model: AppModel) {
 
     if (showEdit) EditDialog(model, editTarget) { showEdit = false }
     if (showSettings) SettingsDialog(model) { showSettings = false }
-    if (showStats) StatisticsDialog(model) { showStats = false }
     if (showDelete) {
         val name = model.selectedDetail?.name ?: ""
         NeuDialogShell(width = 420.dp, title = "删除条目", onDismiss = { showDelete = false }) {
@@ -1161,6 +1148,7 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     var showImport by remember { mutableStateOf(false) }
     var showCatManage by remember { mutableStateOf(false) }
     var showBatch by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
 
     NeuDialogShell(width = 540.dp, title = "设置", onDismiss = onDismiss) {
@@ -1251,6 +1239,8 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
                 NeuButton("分类管理…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) { showCatManage = true }
                 Spacer(Modifier.width(10.dp))
                 NeuButton("批量录入…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) { showBatch = true }
+                Spacer(Modifier.width(10.dp))
+                NeuButton("数据统计…", contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp)) { showStats = true }
             }
 
             Spacer(Modifier.height(18.dp))
@@ -1279,6 +1269,7 @@ fun SettingsDialog(model: AppModel, onDismiss: () -> Unit) {
     if (showImport) ImportDialog(model, onDone = { m -> msg = m; showImport = false })
     if (showCatManage) CategoryManageDialog(model) { showCatManage = false }
     if (showBatch) BatchImportDialog(model) { showBatch = false }
+    if (showStats) StatisticsDialog(model) { showStats = false }
     if (showAbout) AboutDialog { showAbout = false }
 }
 
